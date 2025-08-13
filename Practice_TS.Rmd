@@ -5,6 +5,14 @@ date: "2025-08-12"
 output: html_document
 ---
 
+```{r}
+# terminal commands to push to github 
+# git remote add origin https://github.com/sky-akash/Time-Series.git
+# git push -u origin master
+
+```
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -434,7 +442,7 @@ a10 |>
 
 
 
-```{r tourism australian}
+```{r tourism australian - sub_series vs sub_seasonal plots}
 
 tourism
 
@@ -463,18 +471,21 @@ autoplot(holidays, Trips)+
   labs(title = "Australian domestic holidays")
 
 
-gg_season(holidays, Trips) +
+gg_season(holidays, Trips) +                      # sub seasonal plot ... and there are eight states (as)
   labs(y = "Overnight trips ('000)",
        title = "Australian domestic holidays")
 
-holidays |>
-  gg_subseries(Trips) +
+holidays |>                                       
+  gg_subseries(Trips) +                           # sub series plots ..... time frame is quarterly, and
+                                                  # thus 4 quarters for each state
   labs(y = "Overnight trips ('000)",
        title = "Australian domestic holidays")
 
 ```
 
-
+```{r}
+holidays
+```
 
 
 ```{r}
