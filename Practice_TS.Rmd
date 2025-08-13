@@ -1,0 +1,569 @@
+---
+title: "Time Series"
+author: "Akash Mittal"
+date: "2025-08-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+# ye naam kyun dena ?
+#  Naam dene ke 5 faayde:
+# 1. Error messages ko samajhne mein aasani hoti hai
+# 2. Document ke structure ko samajhna easy ho jaata hai
+# 3. Caching ke liye zaroori hota hai
+#     {r clean-data, cache=TRUE}
+# 4. Output files (like images) ka naam control karna
+#     {r scatter-plot}
+#     plot(cars)
+#     O/p Name will be : scatter-plot-1.png
+# 5. Cross-referencing ke liye
+#     “See analysis in chunk model-fit”
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# Code ko output document mein nahi dikhana, lekin output (jaise plot) ko dikhana.
+# 
+# In simple terms:
+# Code chalega ✔️
+# 
+# Code output aayega ✔️
+# 
+# Code khud nahi dikhega ❌
+
+#plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+______________________________________________________________________________________________________________________
+
+```{r}
+#install.packages("fpp3", dependencies = TRUE)
+
+library(fpp3)         # Loads a collection of packages (including tsibble, fable, feasts) for forecasting and time series analysis.
+
+library(fable)        # Used for forecasting models (like ARIMA, ETS, etc.) with tidy syntax.
+
+library(tibble)       # A modern reimagining of data frames that is more consistent and user-friendly.
+
+library(tsibble)      # Provides a time-aware data structure (tsibble) for tidy time series analysis.
+
+library(feasts)       # Tools for time series feature extraction and decomposition (like STL, ACF, etc.).
+
+library(tsibbledata)  # Provides sample time series datasets (such as `aus_retail`, `global_economy`, etc.).
+
+library(tidyr)        # Helps in tidying data (reshaping, pivoting, separating columns, etc.).
+
+library(ggplot2)      # A popular and flexible system for data visualization using the grammar of graphics.
+
+library(lubridate)    # Makes working with dates and times easier (e.g., parsing, extracting components like year/month).
+
+library(dplyr)        # Used for data manipulation (filtering, selecting, mutating, summarizing, etc.).
+
+library(fabletools)   # Provides tools and infrastructure to support modeling with fable (under the hood utilities).
+
+
+```
+
+```{r avialable datasets}
+
+data() # lists abvailable datasets (A lot of them in these packages....)
+
+```
+
+
+```{r aus_retail dataset}
+
+# summary(aus_retail)
+str(aus_retail)
+
+```
+
+
+
+```{r unique-items}
+
+# aus_retail |> distinct('Series ID')
+# 
+# aus_retail |> unique('State') # issue as unique wants a vector, and can't evven do aus_retail$'State' as It makes me pass df again to original df
+
+aus_retail |> 
+  pull(State) |>
+  unique()
+
+# OR 
+
+unique(pull(aus_retail, State))
+
+# OR 
+
+unique(aus_retail$State)      
+
+# OR Use distinct from (deplyr)
+
+aus_retail |> distinct(State) |> pull()             # All aboe ancd this doens give output as tibble but just "A VECTOR"
+
+aus_retail |> distinct(State) # here even output is a tibble
+
+# ###########
+
+aus_retail |> distinct(`Series ID`)
+aus_retail |> distinct(State)
+aus_retail |> distinct(Industry)
+
+colnames(aus_retail)
+head(aus_retail)
+
+
+aus_retail |> distinct(State, Industry) # distinct also used to in combined series too
+
+```
+
+
+```{r}
+
+aus_retail |>
+  filter(`Series ID` == 'A3349640L') |>
+  autoplot(Turnover)
+
+```
+
+
+```{r}
+aus_retail |> 
+  filter(`Series ID` == "A3349640L") |>
+  model(ETS(Turnover)) |>
+  forecast(h = '2 year')
+
+```
+
+
+
+
+```{r}
+aus_retail |> 
+  filter(`Series ID` == "A3349640L") |>
+  model(ETS(Turnover)) |>
+  forecast(h = '2 years')
+```
+
+
+
+
+```{r ch1}
+
+y <- tsibble(
+  Year = 2015:2019,
+  Observation = c(123, 39, 78, 52, 110),
+  index = Year
+)
+
+plot(y)
+
+y
+
+```
+
+```{r}
+# converting a dataset to tsibble
+
+# z = data.frame("Month" = "2019 Jan" to "2019 May", # won't work as need to individually write the month year data
+#                "observation" = c(50, 23, 45, 34, 67))
+
+z = data.frame(
+  "Month" = seq(yearmonth("2019 Jan"), yearmonth("2019 May"), by = 1),
+  "observation" = c(50, 23, 45, 34, 67))
+
+
+z
+
+z |> 
+  mutate(Month = yearmonth(Month)) |>
+  as_tsibble(index=Month)
+# Not yet assigned back to z, so z will still be a df not a tsibble
+
+z
+
+# Notes on ts data
+# 1. Creating or cleaning time columns
+# If you have a column like "2019 Jan" or "2020 Q2" in character format, you'll use:
+# 
+# Frequency	Use this function	Example
+# Monthly	yearmonth()	yearmonth("2019 Jan")
+# Quarterly	yearquarter()	yearquarter("2020 Q2")
+# Weekly	yearweek()	yearweek("2021 W05")
+# Daily	ymd() or as_date()	ymd("2021-08-12")
+# Hourly+	ymd_hms() or as_datetime()	ymd_hms("2021-08-12 13:45:00")
+
+# 2. Converting to a tsibble
+# as_tsibble(index = time_column) # time_column must of class mentioned above or POSIXct
+
+# 3. Creating date sequences
+# seq(yearmonth("2019 Jan"), yearmonth("2020 Jan"), by = 1)
+# seq(yearquarter("2019 Q1"), yearquarter("2020 Q1"), by = 1)
+# seq(ymd("2022-01-01"), ymd("2022-12-31"), by = "1 day")
+
+#### Notice the difference between how by is passed for difference base values of time
+
+
+```
+
+
+
+```{r}
+# key variables in time series of tsibble 
+# allows multiple time series to be stored in a single object
+#
+
+olympic_running
+
+
+# 312*4 [4Y] - 312 rows, 4 columns and period of 4 years
+# key -> length, sex [14] -> means 14 differencet time series are there
+# The 14 time series in this object are uniquely identified by the keys: the Length and Sex variables.
+#
+
+olympic_running |>
+  distinct(Length, Sex)
+
+```
+
+
+```{r deplyr functions}
+
+# mutate(), filter(), select() and summarise() on tsibble object
+
+PBS
+
+key_vars(PBS)
+
+PBS |>
+  filter(ATC1=="A")
+
+PBS |>
+  filter(ATC1=="A") |>
+  select(Month, Concession, Type)
+
+PBS |>
+  filter(ATC1=="A") |>
+  select(Month, Concession, Type, Cost) |>
+  summarize(TotalC=sum(Cost))
+
+
+PBS |>
+  filter(ATC1 == "A") |>
+  select(Month, Concession, Type, Cost) |>
+  summarize(TotalC = sum(Cost)) |>
+  mutate(Cost = TotalC/1e6)
+
+# saving the tsibble
+
+PBS |>
+  filter(ATC2 == "A10") |>
+  select(Month, Concession, Type, Cost) |>
+  summarise(TotalC = sum(Cost)) |>
+  mutate(Cost = TotalC / 1e6) -> a10          # saving the tsibble
+
+
+a10
+```
+
+```{r}
+has_gaps(PBS)   # Are there any missing time points? # to check for any missing time series data momtnths etc.
+# .gaps = FALSE → No months are missing; the time series is complete.
+# .gaps = TRUE → Some months are missing in the time series — there's a gap in the timeline.
+############
+
+# if any gaps can fill using """""""""fill_gaps()"""""" or """"""na_interpolate()""""""
+
+############
+n_keys(PBS)     # How many unique series?
+```
+
+
+```{r csv_to_tsibble}
+#
+
+prison <- readr::read_csv("https://OTexts.com/fpp3/extrafiles/prison_population.csv")
+
+summary(prison)
+str(prison)
+
+# spc_tbl_ [3,072 × 6] (S3: spec_tbl_df/tbl_df/tbl/data.frame)
+#  $ Date      : Date[1:3072], format: "2005-03-01" "2005-03-01" "2005-03-01" "2005-03-01" ...
+#  $ State     : chr [1:3072] "ACT" "ACT" "ACT" "ACT" ...
+#  $ Gender    : chr [1:3072] "Female" "Female" "Female" "Female" ...
+#  $ Legal     : chr [1:3072] "Remanded" "Remanded" "Sentenced" "Sentenced" ...
+#  $ Indigenous: chr [1:3072] "ATSI" "Non-ATSI" "ATSI" "Non-ATSI" ...
+#  $ Count     : num [1:3072] 0 2 0 5 7 58 5 101 51 131 ...
+#  - attr(*, "spec")=
+#   .. cols(
+#   ..   Date = col_date(format = ""),
+#   ..   State = col_character(),
+#   ..   Gender = col_character(),
+#   ..   Legal = col_character(),
+#   ..   Indigenous = col_character(),
+#   ..   Count = col_double()
+#   .. )
+#  - attr(*, "problems")=<externalptr> 
+
+
+prison <- prison |>
+  mutate(Quarter = yearquarter(Date)) |>
+  select(-Date) |>
+  as_tsibble(key = c(State, Gender, Legal, Indigenous),
+             index = Quarter)
+prison
+
+
+# More complicated (and unusual) seasonal patterns can be specified using the "period()" function in the "lubridate" package.
+
+```
+
+```{r}
+ansett
+```
+
+
+
+```{r Time plots}
+
+melsyd_economy <- ansett |>
+  filter(Airports == "MEL-SYD", Class=="Economy")|>
+  mutate(Passengers = Passengers/1000)
+
+melsyd_economy
+
+autoplot(melsyd_economy,Passengers) + # dataset and the column data which has to be plotted
+  labs(title = "Ansett airlines economy class",
+       subtitle = 'Melbourne-Sydney',
+       y = "Passengers ('000) i.e. in Thousands")
+
+```
+
+```{r}
+
+a10
+
+str(a10)
+#summary(a10)
+
+autoplot(a10, Cost) +
+  labs(y = "Million dollars",
+       title = "Australian drug Sales")
+
+a10 |> 
+  gg_season(Cost, labels = 'both') +
+  labs(y = "Millions Dollars",
+       title = "Seasonal Plot : Antidiabetic Drug Sales")
+
+# making seasonal plot, so it automatically plotted the lines as per every year and different lines for each month as data is monthly seasonal
+
+
+```
+
+
+```{r}
+# data which is seasonal by day
+
+vic_elec
+
+str(vic_elec)
+# i.e. half hourly data is given
+
+vic_elec |> 
+  gg_season(Demand, period = "day")  +           #  If a string (e.g., "1y" for 1 year, "3m" for 3 months,
+                                                # "1d" for 1 day, "1h" for 1 hour, "1min" for 1 minute, "1s"
+                                                # for 1 second), it's converted to a Period class object from
+                                                # the lubridate package. Note that the data must have at least
+                                                # one observation per seasonal period, and the period cannot be
+                                                # smaller than the observation interval.
+  theme(legend.position = "none") + 
+  labs(y = "MWh", title = "Electricity Demand : Victoria")
+
+
+
+```
+
+```{r}
+
+vic_elec |> gg_season(Demand, period = "week") +
+  theme(legend.position = "none") +
+  labs(y="MWh", title="Electricity demand: Victoria")
+
+vic_elec |> gg_season(Demand, period = "month") +
+  labs(y="MWh", title="Electricity demand: Victoria")
+
+vic_elec |> gg_season(Demand, period = "year") +
+  labs(y="MWh", title="Electricity demand: Victoria")
+
+```
+
+Subseries plots
+
+```{r}
+a10
+```
+
+
+```{r subseries plots seasonals}
+
+a10 |>
+  gg_subseries(Cost) +
+  labs(
+    y = "$ (millions)",
+    title = "Australian antidiabetic drug sales"
+  )
+
+```
+
+
+
+
+```{r tourism australian}
+
+tourism
+
+str(tourism)
+
+# tbl_ts [24,320 × 5] (S3: tbl_ts/tbl_df/tbl/data.frame)
+#  $ Quarter: qtr [1:24320] 1998 Q1, 1998 Q2, 1998 Q3, 1998 Q4, 1999 Q1, 1999 Q2, 1999 Q3, 1999 Q4, 2000 Q1, 2000 Q2, ...
+#    ..@ fiscal_start: num 1
+#  $ Region : chr [1:24320] "Adelaide" "Adelaide" "Adelaide" "Adelaide" ...
+#  $ State  : chr [1:24320] "South Australia" "South Australia" "South Australia" "South Australia" ...
+#  $ Purpose: chr [1:24320] "Business" "Business" "Business" "Business" ...
+#  $ Trips  : num [1:24320] 135 110 166 127 137 ...
+
+# tourism is tsibble data with Quarter as time frames..so while grouping the hierarchy is State -> Region
+# grouping by state we get data for 
+
+holidays <- tourism |>
+  filter(Purpose == 'Holiday') |>
+  group_by(State) |>
+  summarise(Trips=sum(Trips))
+
+holidays
+
+autoplot(holidays, Trips)+
+  labs(y = "Trips (thousands") +
+  labs(title = "Australian domestic holidays")
+
+
+gg_season(holidays, Trips) +
+  labs(y = "Overnight trips ('000)",
+       title = "Australian domestic holidays")
+
+holidays |>
+  gg_subseries(Trips) +
+  labs(y = "Overnight trips ('000)",
+       title = "Australian domestic holidays")
+
+```
+
+
+
+
+```{r}
+tourism
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+```{r}
+# Plot one time series
+aus_retail 
+# |>
+#   filter(`Series ID`=="A3349640L") |>
+#   autoplot(Turnover)
+
+
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+# Plot one time series
+# aus_retail |>
+#   filter(`Series ID`=="A3349640L") |>
+#   autoplot(Turnover)
+
+aus_retail <- readr::read_csv("https://OTexts.com/fpp3/extrafiles/aus_retail.csv") |>
+  mutate(Month = yearmonth(Month)) |>
+  as_tsibble(index = Month, key = c(`Series ID`))
+
+
+```
+
+```{r}
+
+```
+
