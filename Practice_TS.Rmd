@@ -1291,6 +1291,13 @@ tourism |>
 
 
 ```{r Computing all features :)}
+################################################################################
+################################################################################
+###############################                  ###############################
+###############################     feasts       ###############################
+###############################                  ###############################
+################################################################################
+################################################################################
 
 tourism_features <- tourism |>
   features(Trips, feature_set(pkgs = "feasts"))
@@ -1304,31 +1311,46 @@ tourism_features
 # all features that involve seasonality, along with the Purpose variable.
 
 library(glue)
+x11()
 
 tourism_features |>
   select_at(vars(contains("season"), Purpose)) |>                      # features with season
   mutate(
     seasonal_peak_year = seasonal_peak_year +
-      4*(seasonal_peak_year==0),
+      4*(seasonal_peak_year==0),                                  # A conditional check for 0 and then modify it to 4 (without                                                                      using ifelse)
     seasonal_trough_year = seasonal_trough_year +
       4*(seasonal_trough_year==0),
-    seasonal_peak_year = glue("Q{seasonal_peak_year}"),
-    seasonal_trough_year = glue("Q{seasonal_trough_year}"),
+    
+    seasonal_peak_year = glue("Q{seasonal_peak_year}"),           # This wraps the numeric value with a "Q" prefix, Q1
+    
+    seasonal_trough_year = glue("Q{seasonal_trough_year}"),       # wraps numeric value
   ) |>
   GGally::ggpairs(mapping = aes(colour = Purpose))
-
+x11()
 ```
 
 
 ```{r}
 
 library(broom)
+
 pcs <- tourism_features |>
+
   select(-State, -Region, -Purpose) |>
-  prcomp(scale = TRUE) |>
-  augment(tourism_features)
+  
+  prcomp(scale = TRUE) |>                                 # PCA analysis, scaling standardies the features mean=0, stdev=1 
+  
+  augment(tourism_features)     # augment() from broom adds fitted values/PCA scores back to original data (tourism_features).
+
+
 pcs |>
-  ggplot(aes(x = .fittedPC1, y = .fittedPC2, col = Purpose)) +
+  
+  ggplot(
+    aes(
+      x = .fittedPC1,
+      y = .fittedPC2,
+      col = Purpose)
+    ) +
   geom_point() +
   theme(aspect.ratio = 1)
 
@@ -1338,9 +1360,10 @@ pcs |>
 ```{r}
 
 outliers <- pcs |>
-  filter(.fittedPC1 > 10) |>
+  filter(.fittedPC1 > 10) |>                                # 10 is arbitraray choosen lets say from plot
   select(Region, State, Purpose, .fittedPC1, .fittedPC2)
 outliers
+
 #> # A tibble: 4 × 5
 #>   Region                 State             Purpose  .fittedPC1 .fittedPC2
 #>   <chr>                  <chr>             <chr>         <dbl>      <dbl>
@@ -1348,6 +1371,8 @@ outliers
 #> 2 Australia's South West Western Australia Holiday        10.9      0.880
 #> 3 Melbourne              Victoria          Holiday        12.3    -10.4  
 #> 4 South Coast            New South Wales   Holiday        11.9      9.42
+#> 
+
 outliers |>
   left_join(tourism, by = c("State", "Region", "Purpose"), multiple = "all") |>
   mutate(Series = glue("{State}", "{Region}", "{Purpose}", .sep = "\n\n")) |>
@@ -1360,6 +1385,7 @@ outliers |>
 
 
 ```{r}
+
 ```
 
 
