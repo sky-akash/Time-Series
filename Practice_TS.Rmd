@@ -3,6 +3,9 @@ title: "Time Series"
 author: "Akash Mittal"
 date: "2025-08-12"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r}
@@ -17,16 +20,19 @@ output: html_document
 
 ```
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This is an R Markdown document. Markdown is a simple formatting syntax
+for authoring HTML, PDF, and MS Word documents. For more details on
+using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+When you click the **Knit** button a document will be generated that
+includes both content as well as the output of any embedded R code
+chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
 # ye naam kyun dena ?
@@ -60,9 +66,10 @@ You can also embed plots, for example:
 #plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Note that the `echo = FALSE` parameter was added to the code chunk to
+prevent printing of the R code that generated the plot.
 
-______________________________________________________________________________________________________________________
+------------------------------------------------------------------------
 
 ```{r}
 #install.packages("fpp3", dependencies = TRUE)
@@ -89,7 +96,8 @@ library(dplyr)        # Used for data manipulation (filtering, selecting, mutati
 
 library(fabletools)   # Provides tools and infrastructure to support modeling with fable (under the hood utilities).
 
-
+library(slider)
+library(seasonal)
 ```
 
 ## Time Series Graphics
@@ -100,15 +108,12 @@ data() # lists abvailable datasets (A lot of them in these packages....)
 
 ```
 
-
 ```{r aus_retail dataset}
 
 # summary(aus_retail)
 str(aus_retail)
 
 ```
-
-
 
 ```{r unique-items}
 
@@ -148,7 +153,6 @@ aus_retail |> distinct(State, Industry) # distinct also used to in combined seri
 
 ```
 
-
 ```{r}
 
 aus_retail |>
@@ -156,7 +160,6 @@ aus_retail |>
   autoplot(Turnover)
 
 ```
-
 
 ```{r}
 aus_retail |> 
@@ -166,18 +169,12 @@ aus_retail |>
 
 ```
 
-
-
-
 ```{r}
 aus_retail |> 
   filter(`Series ID` == "A3349640L") |>
   model(ETS(Turnover)) |>
   forecast(h = '2 years')
 ```
-
-
-
 
 ```{r ch1}
 
@@ -237,8 +234,6 @@ z
 
 ```
 
-
-
 ```{r}
 # key variables in time series of tsibble 
 # allows multiple time series to be stored in a single object
@@ -256,7 +251,6 @@ olympic_running |>
   distinct(Length, Sex)
 
 ```
-
 
 ```{r deplyr functions}
 
@@ -309,7 +303,6 @@ has_gaps(PBS)   # Are there any missing time points? # to check for any missing 
 n_keys(PBS)     # How many unique series?
 ```
 
-
 ```{r csv_to_tsibble}
 #
 
@@ -353,8 +346,6 @@ prison
 ansett
 ```
 
-
-
 ```{r Time plots}
 
 melsyd_economy <- ansett |>
@@ -390,7 +381,6 @@ a10 |>
 
 
 ```
-
 
 ```{r}
 # data which is seasonal by day
@@ -430,6 +420,7 @@ vic_elec |> gg_season(Demand, period = "year") +
   labs(y="MWh", title="Electricity demand: Victoria")
 
 ```
+
 ```{r}
 
 # # vic_elec |> gg_season(Demand, period = "month")
@@ -439,7 +430,6 @@ vic_elec |> gg_season(Demand, period = "year") +
 #        title = "Australian antidiabetic drug sales")
 
 ```
-
 
 Subseries plots
 
@@ -465,9 +455,6 @@ a10 |>
   )
 
 ```
-
-
-
 
 ```{r tourism australian - sub_series vs sub_seasonal plots}
 
@@ -514,7 +501,6 @@ holidays |>
 holidays
 ```
 
-
 ```{r}
 
 vic_elec |>
@@ -524,9 +510,6 @@ vic_elec |>
        title = "Half-hourly electricity demand: Victoria")
 
 ```
-
-
-
 
 ```{r}
 vic_elec
@@ -582,15 +565,11 @@ visitors |>
 
 ```
 
-
-
-
 ```{r}
 
 unique(visitors$State)
 
 ```
-
 
 ```{r lag plots}
 
@@ -611,7 +590,6 @@ recent_production |>
 
 ```
 
-
 ```{r autocorrelations}
 
 recent_production |>
@@ -627,8 +605,10 @@ recent_production |>
   
 
 ```
-* peaks in 4 quarters and troughs too.
-* dashed blue line -> if correlations are significantly differente from 0 or not. "Bartlett Bands"
+
+-   peaks in 4 quarters and troughs too.
+-   dashed blue line -\> if correlations are significantly differente
+    from 0 or not. "Bartlett Bands"
 
 ```{r trend and seasonality in ACF}
 
@@ -644,7 +624,8 @@ a10 |>
 
 
 ```
- <!-- exponentially decreasing acf with peaks at every 12 months apart..better check the PACF plots too.  -->
+
+<!-- exponentially decreasing acf with peaks at every 12 months apart..better check the PACF plots too.  -->
 
 ```{r drawing PACF}
 a10 |>
@@ -653,7 +634,6 @@ a10 |>
   labs(title="ACT Anti")
 
 ```
-
 
 ```{r White Noise}
 set.seed(3)
@@ -701,7 +681,6 @@ tsibbledata::global_economy |>
 
 ```
 
-
 ```{r inflation price adjustments}
 
 print_retail <- aus_retail |>
@@ -728,7 +707,6 @@ print_retail
 
 ```
 
-
 ```{r}
 
 print_retail |>
@@ -750,18 +728,21 @@ print_retail
 
 ```
 
+Box COX Transformation (allows for negative values which log transform
+doesn't) (also helps in converting data to normal form (not always))
 
-Box COX Transformation (allows for negative values which log transform doesn't) (also helps in converting data to normal form (not always))
-    
-      |
-      | log(Yt)      if λ = 0  (for log 0, ie. zero remainss zero)
-Wt =  | 
-      | ((sign(Yt)/Yt)^(λ) - 1) / λ        else
-      | OR 
-      | (Yt)^(λ) - 1) / λ)                  # variation neeeds to know difference
-      
-A good value of  λ  is one which makes the size of the seasonal variation about the same across the whole series, as that makes the forecasting model simpler.
-      
+```         
+  |
+  | log(Yt)      if λ = 0  (for log 0, ie. zero remainss zero)
+```
+
+Wt = \| \| ((sign(Yt)/Yt)\^(λ) - 1) / λ else \| OR \| (Yt)\^(λ) - 1) /
+λ) \# variation neeeds to know difference
+
+A good value of λ is one which makes the size of the seasonal variation
+about the same across the whole series, as that makes the forecasting
+model simpler.
+
 ```{r BoX Cox Transformation & guerrero feature}
 
 # lambda is found using guerrero feature
@@ -801,6 +782,7 @@ autoplot(us_retail_employment,Employed)+
 
 
 ```
+
 <!-- # looks to have trend and some seasonality maybe ? let's divide into parts and check | -->
 
 ```{r decomposition}
@@ -819,23 +801,571 @@ str(components(dcmp))
 
 ```{r}
 
+str(components(dcmp))
+
+components(dcmp) |>
+  as_tsibble()
+
 components(dcmp) |>
   as_tsibble() |>                                                 # components(dcmp) is a dataframe so need to                                                                         # convert to tsibble
   autoplot(Employed, colour="pink") +
   geom_line(aes(y=trend), colour="darkgreen") +
   labs(
     y = "Persons (k)",
-    title = "Total Employment in US Retail"
+    title = "Total Employment in US Retail (Trend)"
   )
 
+# Seasonally Adjusted Data
+
+# data after removing seasonal compoenet from data
+
+components(dcmp) |>
+  as_tsibble() |>
+  autoplot(Employed, colour = "gray") +
+  geom_line(aes(y=season_adjust), colour = "#0072B2") +
+  labs(y = "Persons (thousands)",
+       title = "Total employment in US retail (Seasonally Adjusted)")
+
 ```
 
+<!-- Seasonally adjusted plot is wiggly, because it has Trend component and the remainder compoentns (noise) -->
+
+```{r plotting all components}
+
+components(dcmp) |> autoplot()           # here we didn't need it to be tsibble object ?
+
+# lets try by converting it to tsibble
+
+components(dcmp) |>
+  as_tsibble() |>
+  autoplot()                 # doesn't wor kas required !
+
+# alternative
+components(dcmp) |>
+  as_tsibble() |>
+  pivot_longer(cols = c(trend, season_year, remainder), names_to = "component") |>
+  ggplot(aes(x = Month, y = value)) +                   # "|" inside ggplot is used fro faceting/ facets so diff
+                                                          # plot  for each component
+  geom_line() + 
+  facet_wrap(~ component, scales="free_y") + 
+  labs(
+    y = "Value",
+    title = "Decomposed Components"
+  ) + 
+  theme_minimal()
+
+
+
+```
+
+<!-- The grey bars to the right of each panel show the relative scales of the components. Each grey bar represents the same length but because the plots are on different scales, the bars vary in size. -->
 
 ```{r}
 
 
 ```
 
+```{r moving averages}
+
+global_economy
+
+global_economy |>
+  filter(Country == "Australia")
+
+global_economy |>
+  filter(Country == "Australia") |>
+  autoplot(Exports) +
+  labs(y = "% of GDP", title = "Total Australian exports")
+
+
+################################################
+
+aus_exports <- global_economy |>
+  filter(Country == "Australia") |>
+  mutate(
+    `5-MA` = slider::slide_dbl(Exports, mean,
+                .before = 2, .after = 2, .complete = TRUE),
+    `3-MA` = slider::slide_dbl(Exports, mean,
+                .before = 1, .after = 1, .complete = TRUE),
+    `7-MA` = slider::slide_dbl(Exports, mean,
+                .before = 3, .after = 3, .complete = TRUE)
+  ) # 5 period moving average so there will be 2 less observations on top and two less en end
+
+aus_exports
+
+aus_exports |>
+  autoplot(Exports) +
+  geom_line(aes(y = `5-MA`), colour = "red") +
+  geom_line(aes(y = `7-MA`), colour = "green") +
+  geom_line(aes(y = `3-MA`), colour = "yellow") +
+  labs(y = "% of GDP",
+       title = "Total Australian exports")
+
+# slide(.x, .f, ..., .before = 0L, .after = 0L, .step = 1L, .complete = FALSE)
+# sliding on a, applying function f.
+
+```
+
+```{r Moving Average of Moving Averages}
+
+aus_production # Quarterly Data
+
+beer <- aus_production |>
+  filter(year(Quarter) >= 1992) |>
+  select(Quarter, Beer)
+
+
+beer_ma <-
+  beer |>
+  mutate(
+  
+    `4-MA` = slider::slide_dbl(Beer, mean,
+                .before = 1, .after = 2, .complete = TRUE),
+    
+    `2x4-MA` = slider::slide_dbl(`4-MA`, mean,
+                .before = 1, .after = 0, .complete = TRUE)
+  )
+
+# > >   Y(1)
+# > >...Y(1,2) 4MA(1)
+#         but 4MA(1) is for this line in real              
+# > >   y(1,2) 4MA(2)                                 2*4MA (i.e. average of 2.5 and 2.5 is 3)
+#         but 4MA(2) is for this line in real               
+# > >   Y(1,2) 
+# > >   Y(2)
+# > > 
+
+# Lets plot it
+
+beer_ma |>
+  autoplot(`Beer`) +
+  geom_line(aes(y = `2x4-MA`), colour = "purple")
+
+
+```
+
+```{r trend-cycle + seasonal }
+
+us_retail_employment # monthly seasonal
+
+us_retail_employment_ma <- us_retail_employment |>
+  mutate(
+    `12-MA` = slider::slide_dbl(Employed, mean,
+                .before = 5, .after = 6, .complete = TRUE),
+    `2x12-MA` = slider::slide_dbl(`12-MA`, mean,
+                .before = 1, .after = 0, .complete = TRUE)
+  )
+
+
+us_retail_employment_ma |>
+  autoplot(Employed, colour = "gray") +
+  geom_line(aes(y = `2x12-MA`), colour = "#D55E00") +
+  labs(y = "Persons (thousands)",
+       title = "Total employment in US retail")
+
+```
+
+<!-- Classical decomposition -->
+
+<!-- Additive decomposition \ -->
+
+<!-- Step 1 -->
+<!-- If $m$ is an even number, compute the -->
+<!-- trend-cycle component $\hat{T}_t$ using a $2 \times m$-MA. If $m$ is an -->
+<!-- odd number, compute the trend-cycle component $\hat{T}_t$ using an -->
+<!-- $m$-MA. -->
+
+<!-- Step 2 -->
+<!-- Calculate the detrended series: $y_t - \hat{T}_t$. -->
+
+<!-- Step 3 -->
+<!-- To estimate the seasonal component for each season, simply average the -->
+<!-- detrended values for that season. For example, with monthly data, the -->
+<!-- seasonal component for March is the average of all the detrended March -->
+<!-- values in the data. These seasonal component values are then adjusted to -->
+<!-- ensure that they add to zero. The seasonal component is obtained by -->
+<!-- stringing together these monthly values, and then replicating the -->
+<!-- sequence for each year of data. This gives $\hat{S}_t$. -->
+
+<!-- Step 4 -->
+<!-- The remainder component is calculated by subtracting the estimated -->
+<!-- seasonal and trend-cycle components: $$ -->
+<!-- \hat{R}_t = y_t - \hat{T}_t - \hat{S}_t -->
+
+
+```{r Classical decomposition}
+
+# feasts pacakege function classical_decomposition
+# type - additive or multiplicative
+# classical_decomposition(formula, type = c("additive", "multiplicative"), ...)
+# ... Other arguments passed to stats::decompose().
+
+us_retail_employment |>
+  model(
+    feasts::classical_decomposition(Employed, type = "additive")
+  ) |>
+  components() |>
+  autoplot() +
+  labs(title = "Classical additive decomposition of total
+                  US retail employment")
+
+ # earlier we used ... STL Decomposition
+# fabletools::model(
+#                     stl = STL(Employed)
+#                     )
+# fabletools::components(dcmp)
+
+```
+
+<!-- Multiplicatie Decomposition -->
+<!-- Step 1 -->
+<!-- If \( m \) is an even number, compute the trend-cycle component \( \hat{T}_t \) using a \( 2 \times m \)-MA. If \( m \) is an odd number, compute the trend-cycle component \( \hat{T}_t \) using an \( m \)-MA. -->
+
+<!-- Step 2 -->
+<!-- Calculate the detrended series:   -->
+<!-- \[ -->
+<!-- \frac{y_t}{\hat{T}_t} -->
+<!-- \] -->
+
+<!-- Step 3 -->
+<!-- To estimate the seasonal component for each season, simply average the detrended values for that season. For example, with monthly data, the seasonal index for March is the average of all the detrended March values in the data. These seasonal indexes are then adjusted to ensure that they add to \( m \). The seasonal component is obtained by stringing together these monthly indexes, and then replicating the sequence for each year of data. This gives \( \hat{S}_t \). -->
+
+<!-- Step 4 -->
+<!-- The remainder component is calculated by dividing out the estimated seasonal and trend-cycle components:   -->
+<!-- \[ -->
+<!-- \hat{R}_t = \frac{y_t}{\hat{T}_t \hat{S}_t} -->
+<!-- \] -->
+
+```{r Multiplicative decomposition}
+
+us_retail_employment |>
+  model(
+    feasts::classical_decomposition(Employed, type = "multiplicative")
+  ) |>
+  components() |>
+  autoplot() +
+  labs(title = "Classical Multiplicative decomposition of total
+                  US retail employment")
+
+```
+
+<!-- Visually  dont see major different in curves but see the difference in grey bars for Employed and Trend -->
+
+<!-- # X11 and SEATS -->
+
+X-11 -> The X-11 method uses weighted averages over a moving window of the time series. This is used in combination with the RegARIMA model to prepare the data for decomposition. To use the X-11 decomposition method, the x11() function can be used in the model formula
+
+SEATS -> default method for seasonally adjusting the data. This decomposition method can extract seasonality from data with seasonal periods of 2 (biannual), 4 (quarterly), 6 (bimonthly), and 12 (monthly). This method is specified using the seats() function in the model formula.
+
+```{r x11 method of decomposition}
+
+# Deeloped by Official statistics agencies (such as the US Census Bureau and the Australian Bureau of Statistics)
+
+# Most of them use variants of the X-11 method, or the SEATS method, or a combination of the two. These methods are designed specifically to work with quarterly and monthly data, which are the most common series handled by official statistics agencies. They will not handle seasonality of other kinds, such as daily data, or hourly data, or weekly data. 
+
+# There are methods for both ADDITIVE and MULTIPLICATIVE decomposition. 
+
+# x11 decomposition is in X-13ARIMA-SEATS  function of feasts package
+# but we also installed seasonal package for this
+
+us_retail_employment
+
+x11_dcmp <- us_retail_employment |>
+  model(x11 = X_13ARIMA_SEATS(Employed ~ x11())) |>
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+    "Decomposition of total US retail employment using X-11.")
+
+#######################################
+
+x11_dcmp
+
+x11_dcmp |>
+  ggplot(aes(x = Month)) +
+  geom_line(aes(y = Employed, colour = "Data")) +
+  geom_line(aes(y = season_adjust,
+                colour = "Seasonally Adjusted")) +
+  geom_line(aes(y = trend, colour = "Trend")) +
+  labs(y = "Persons (thousands)",
+       title = "Total employment in US retail") +
+  scale_colour_manual(
+    values = c("gray", "#0072B2", "#D55E00"),
+    breaks = c("Data", "Seasonally Adjusted", "Trend")
+  )
+
+######################################
+#         Subseries Plots            #
+######################################
+x11_dcmp |>
+  gg_subseries(trend)
+
+x11_dcmp |>
+  gg_subseries(seasonal)
+
+```
+
+```{r SEATS method - Seasonal Extraction in ARIMA Time Series}
+
+seats_dcmp <- us_retail_employment |>
+  model(seats = X_13ARIMA_SEATS(Employed ~ seats())) |>
+  components()
+autoplot(seats_dcmp) +
+  labs(title =
+    "Decomposition of total US retail employment using SEATS")
+
+# The results are similar though
+```
+
+```{r STL Decomposition}
+
+us_retail_employment        # Monthly Series
+
+#################################################################################
+#   ?STL     -> Multiple seasonal decomposition by Loess  | from feasts
+#   Decompose a time series into seasonal, trend and remainder components. Seasonal components are estimated iteratively using STL. Multiple seasonal periods are allowed. The trend component is computed for the last iteration of STL. Non-seasonal time series are decomposed into trend and remainder only. In this case, supsmu is used to estimate the trend. Optionally, the time series may be Box-Cox transformed before decomposition. Unlike stl, mstl is completely automated.
+# 
+# STL(formula, iterations = 2, ...)
+# trend(window, degree, jump)
+# season(period = NULL, window = NULL, degree, jump) | If the window is set to "periodic" or Inf, the seasonal pattern will be fixed. 
+#
+#################################################################################
+
+us_retail_employment |>
+  model(
+    feasts::STL(Employed ~ trend(window = 7) +           # span(in lags)of loess window (need be ODD)
+                   season(window = "periodic"),         # window is set to "periodic" or Inf, the                                                             seasonal pattern will be fixed.
+    robust = TRUE)) |>
+  components() |>
+  autoplot()
+
+#
+#
+#  The two main parameters to be chosen when using STL are the trend-cycle window trend(window = ?) and the seasonal window season(window = ?). These control how rapidly the trend-cycle and seasonal components can change. Smaller values allow for more rapid changes. Both trend and seasonal windows should be odd numbers; trend window is the number of consecutive observations to be used when estimating the trend-cycle; season window is the number of consecutive years to be used in estimating each value in the seasonal component. Setting the seasonal window to be infinite is equivalent to forcing the seasonal component to be periodic season(window='periodic') (i.e., identical across years). 
+#
+#########################################
+```
+
+
+## Time series features
+
+<!-- The feasts package includes functions for Feature Extraction And Statistics from Time Series (hence the name) -->
+
+
+
+```{r descriptive features}
+
+# dataset
+tourism  # quarterly REgion + State + Purpose + Trips
+
+tourism |>
+  features(Trips, list(mean=mean, sd=sd, quantiles=quantile)) |>
+  arrange(mean)                                           # will sort in ascending order of mean
+
+#other way
+
+tourism |>
+  features(Trips, quantile)
+
+
+```
+
+
+```{r ACF features}
+# A time series decomposition can be used to measure the strength of trend and seasonality in a time series
+
+# when we have a large collection of time series, and need to find the series with the most trend or the most seasonality
+
+# feat_acf()
+
+tourism |>
+  features(Trips, feat_acf)
+
+colnames(tourism |>
+  features(Trips, feat_acf)
+)
+
+# using these features in plots to identify what type of series are heavily trended and what are most seasonal.
+```
+
+```{r}
+
+tourism |>
+  features(Trips, feat_stl)
+
+colnames(tourism |>
+  features(Trips, feat_stl))
+
+
+#####
+
+tourism |>
+  features(Trips, feat_stl) |>
+  ggplot(aes(x = trend_strength, y = seasonal_strength_year,
+             col = Purpose)) +
+  geom_point() +
+  facet_wrap(vars(State))
+
+```
+Holiday series are most seasonal.
+
+```{r}
+# identifying most seasonal series and plotting it
+
+
+tourism |>
+  features(Trips, feat_stl) |>
+  filter(
+    seasonal_strength_year == max(seasonal_strength_year)
+  ) |>
+  left_join(tourism, by = c("State", "Region", "Purpose"), multiple = "all") |>    # c("State", "Region", "Purpose") is the key :)       ||||||||||    "all", the default, returns every match detected in y. This is the same behavior as SQL.
+  ggplot(aes(x = Quarter, y = Trips)) +
+  geom_line() + 
+  facet_grid(vars(State, Region, Purpose))
+
+################################################################################
+#
+# # ?vars
+# # vars() is a quoting function that takes inputs to be evaluated in the context of a dataset. These inputs can be:
+# 
+# variable names
+# 
+# complex expressions
+# 
+# In both cases, the results (the vectors that the variable represents or the results of the expressions) are used to form faceting groups.
+# 
+################################################################################
+
+# # The feat_stl() function returns several more features other than those discussed above.# 
+# seasonal_peak_year indicates the timing of the peaks — which month or quarter contains the largest seasonal component. This tells us something about the nature of the seasonality. In the Australian tourism data, if Quarter 3 is the peak seasonal period, then people are travelling to the region in winter, whereas a peak in Quarter 1 suggests that the region is more popular in summer.
+# seasonal_trough_year indicates the timing of the troughs — which month or quarter contains the smallest seasonal component.
+# spikiness measures the prevalence of spikes in the remainder component  # Rt of the STL decomposition. It is the variance of the leave-one-out variances of Rt.
+# linearity measures the linearity of the trend component of the STL decomposition. It is based on the coefficient of a linear regression applied to the trend component.
+# curvature measures the curvature of the trend component of the STL decomposition. It is based on the coefficient from an orthogonal quadratic regression applied to the trend component.
+# stl_e_acf1 is the first autocorrelation coefficient of the remainder series.
+# stl_e_acf10 is the sum of squares of the first ten autocorrelation coefficients of the remainder series.
+
+# ?left_join
+
+```
+
+
+```{r More Features in feasts}
+# 
+# The remaining features in the feasts package, not previously discussed, are listed here for reference. The details of some of them are discussed later in the book.
+# 
+# coef_hurst will calculate the Hurst coefficient of a time series which is a measure of “long memory”. A series with long memory will have significant autocorrelations for many lags.
+# feat_spectral will compute the (Shannon) spectral entropy of a time series, which is a measure of how easy the series is to forecast. A series which has strong trend and seasonality (and so is easy to forecast) will have entropy close to 0. A series that is very noisy (and so is difficult to forecast) will have entropy close to 1.
+# box_pierce gives the Box-Pierce statistic for testing if a time series is white noise, and the corresponding p-value. This test is discussed in Section 5.4.
+# ljung_box gives the Ljung-Box statistic for testing if a time series is white noise, and the corresponding p-value. This test is discussed in Section 5.4.
+# The  
+# k
+#  th partial autocorrelation measures the relationship between observations  
+# k
+#   periods apart after removing the effects of observations between them. So the first partial autocorrelation ( 
+# k
+# =
+# 1
+#  ) is identical to the first autocorrelation, because there is nothing between consecutive observations to remove. Partial autocorrelations are discussed in Section 9.5. The feat_pacf function contains several features involving partial autocorrelations including the sum of squares of the first five partial autocorrelations for the original series, the first-differenced series and the second-differenced series. For seasonal data, it also includes the partial autocorrelation at the first seasonal lag.
+# unitroot_kpss gives the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) statistic for testing if a series is stationary, and the corresponding p-value. This test is discussed in Section 9.1.
+# unitroot_pp gives the Phillips-Perron statistic for testing if a series is non-stationary, and the corresponding p-value.
+# unitroot_ndiffs gives the number of differences required to lead to a stationary series based on the KPSS test. This is discussed in Section 9.1
+# unitroot_nsdiffs gives the number of seasonal differences required to make a series stationary. This is discussed in Section 9.1.
+# var_tiled_mean gives the variances of the “tiled means” (i.e., the means of consecutive non-overlapping blocks of observations). The default tile length is either 10 (for non-seasonal data) or the length of the seasonal period. This is sometimes called the “stability” feature.
+# var_tiled_var gives the variances of the “tiled variances” (i.e., the variances of consecutive non-overlapping blocks of observations). This is sometimes called the “lumpiness” feature.
+# shift_level_max finds the largest mean shift between two consecutive sliding windows of the time series. This is useful for finding sudden jumps or drops in a time series.
+# shift_level_index gives the index at which the largest mean shift occurs.
+# shift_var_max finds the largest variance shift between two consecutive sliding windows of the time series. This is useful for finding sudden changes in the volatility of a time series.
+# shift_var_index gives the index at which the largest variance shift occurs.
+# shift_kl_max finds the largest distributional shift (based on the Kulback-Leibler divergence) between two consecutive sliding windows of the time series. This is useful for finding sudden changes in the distribution of a time series.
+# shift_kl_index gives the index at which the largest KL shift occurs.
+# n_crossing_points computes the number of times a time series crosses the median.
+# longest_flat_spot computes the number of sections of the data where the series is relatively unchanging.
+# stat_arch_lm returns the statistic based on the Lagrange Multiplier (LM) test of Engle (1982) for autoregressive conditional heteroscedasticity (ARCH).
+# guerrero computes the optimal  
+# λ
+#   value for a Box-Cox transformation using the Guerrero method (discussed in Section 3.1).
+
+
+```
+
+
+```{r Computing all features :)}
+
+tourism_features <- tourism |>
+  features(Trips, feature_set(pkgs = "feasts"))
+
+tourism_features
+
+```
+
+
+```{r}
+# all features that involve seasonality, along with the Purpose variable.
+
+library(glue)
+
+tourism_features |>
+  select_at(vars(contains("season"), Purpose)) |>                      # features with season
+  mutate(
+    seasonal_peak_year = seasonal_peak_year +
+      4*(seasonal_peak_year==0),
+    seasonal_trough_year = seasonal_trough_year +
+      4*(seasonal_trough_year==0),
+    seasonal_peak_year = glue("Q{seasonal_peak_year}"),
+    seasonal_trough_year = glue("Q{seasonal_trough_year}"),
+  ) |>
+  GGally::ggpairs(mapping = aes(colour = Purpose))
+
+```
+
+
+```{r}
+
+library(broom)
+pcs <- tourism_features |>
+  select(-State, -Region, -Purpose) |>
+  prcomp(scale = TRUE) |>
+  augment(tourism_features)
+pcs |>
+  ggplot(aes(x = .fittedPC1, y = .fittedPC2, col = Purpose)) +
+  geom_point() +
+  theme(aspect.ratio = 1)
+
+```
+
+
+```{r}
+
+outliers <- pcs |>
+  filter(.fittedPC1 > 10) |>
+  select(Region, State, Purpose, .fittedPC1, .fittedPC2)
+outliers
+#> # A tibble: 4 × 5
+#>   Region                 State             Purpose  .fittedPC1 .fittedPC2
+#>   <chr>                  <chr>             <chr>         <dbl>      <dbl>
+#> 1 Australia's North West Western Australia Business       13.4    -11.3  
+#> 2 Australia's South West Western Australia Holiday        10.9      0.880
+#> 3 Melbourne              Victoria          Holiday        12.3    -10.4  
+#> 4 South Coast            New South Wales   Holiday        11.9      9.42
+outliers |>
+  left_join(tourism, by = c("State", "Region", "Purpose"), multiple = "all") |>
+  mutate(Series = glue("{State}", "{Region}", "{Purpose}", .sep = "\n\n")) |>
+  ggplot(aes(x = Quarter, y = Trips)) +
+  geom_line() +
+  facet_grid(Series ~ ., scales = "free") +
+  labs(title = "Outlying time series in PC space")
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
 
 ```{r}
 ```
@@ -847,6 +1377,81 @@ components(dcmp) |>
 
 ```{r}
 ```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+
+
+
+
+
 
 
 
@@ -866,7 +1471,6 @@ aus_retail
 
 ```
 
-
 ```{r}
 
 # Plot one time series
@@ -884,4 +1488,3 @@ aus_retail <- readr::read_csv("https://OTexts.com/fpp3/extrafiles/aus_retail.csv
 ```{r}
 
 ```
-
