@@ -10,6 +10,11 @@ output: html_document
 # git remote add origin https://github.com/sky-akash/Time-Series.git
 # git push -u origin master
 
+# want to know what changed between committs ?
+# git log c5e3719..3c5a3e8
+# git log --oneline c5e3719..3c5a3e8
+# ? what changed from commit A (c5e3719) to commit B (3c5a3e8).
+
 ```
 
 
@@ -86,6 +91,8 @@ library(fabletools)   # Provides tools and infrastructure to support modeling wi
 
 
 ```
+
+## Time Series Graphics
 
 ```{r avialable datasets}
 
@@ -408,6 +415,9 @@ vic_elec |>
 ```
 
 ```{r}
+# seasonal plots
+
+vic_elec
 
 vic_elec |> gg_season(Demand, period = "week") +
   theme(legend.position = "none") +
@@ -420,13 +430,30 @@ vic_elec |> gg_season(Demand, period = "year") +
   labs(y="MWh", title="Electricity demand: Victoria")
 
 ```
+```{r}
+
+# # vic_elec |> gg_season(Demand, period = "month")
+# # Cannot pass series as strings in gg_subseries , it re
+# vic_elec |> gg_subseries(Demand, period = 336) +
+#   labs(y = "Million dollars",
+#        title = "Australian antidiabetic drug sales")
+
+```
+
 
 Subseries plots
 
 ```{r}
 a10
+
+str(a10)
 ```
 
+```{r}
+a10 |>
+  gg_season(Cost)
+
+```
 
 ```{r subseries plots seasonals}
 
@@ -489,20 +516,12 @@ holidays
 
 
 ```{r}
-tourism
-```
 
-
-
-
-```{r}
-
-```
-
-
-
-
-```{r}
+vic_elec |>
+  filter(year(Time) == 2014) |>
+  autoplot(Demand) +
+  labs(y = "GW",
+       title = "Half-hourly electricity demand: Victoria")
 
 ```
 
@@ -510,6 +529,56 @@ tourism
 
 
 ```{r}
+vic_elec
+
+vic_elec |>
+  filter(year(Time) == 2014) |>
+  autoplot(Temperature) +
+  labs(
+    y = "deg C",
+    title = "Half Hourly Temperatures (Melbourne)"
+  )
+
+# Note: In the dataset, the temperatures are for Melbourne, the largest city in Victoria, while the demand values are for the entire state.
+
+```
+
+```{r}
+# scatterplot of series Temp vs demand
+
+vic_elec |>
+  filter(year(Time)==2014) |>
+  ggplot(aes(x=Temperature, y=Demand)) +
+  geom_point() + 
+  labs(
+    title = "Electricity Demand vs Temp.",
+    x = "Temp. deg C Melbourne",
+    y = "Electricity  Demand in Victoria"
+  )
+
+
+```
+
+```{r}
+# Scatterplot Matrices
+
+
+visitors <- tourism |>
+  group_by(State) |>
+  summarise(Trips = sum(Trips))
+
+
+visitors |>
+  ggplot(aes(x = Quarter, y = Trips)) +
+  geom_line() +
+  facet_grid(vars(State), scales = "free_y") +
+  labs(title = "Australian domestic tourism",
+       y= "Overnight trips ('000)")
+
+
+visitors |>
+  pivot_wider(values_from=Trips, names_from=State) |>
+  GGally::ggpairs(columns = 2:9)
 
 ```
 
@@ -518,27 +587,265 @@ tourism
 
 ```{r}
 
-```
-
-
-
-
-```{r}
+unique(visitors$State)
 
 ```
 
 
+```{r lag plots}
 
+aus_production 
+str(aus_production)
+#summary(aus_production) - error isssue with time series
+
+```
 
 ```{r}
+
+recent_production <- aus_production |>
+  filter(year(Quarter) >= 1990)
+
+recent_production |>
+  feasts::gg_lag(Beer, geom = "path", lags = 1:10, arrow=TRUE) +                   # geom can be "point" or "path" # by fefault there are 9 lags 
+  labs(x = "lag(Beer, k)")
 
 ```
 
 
+```{r autocorrelations}
+
+recent_production |>
+  feasts::ACF(Beer, lag_max = 50)
+  
+
+recent_production |>
+  feasts::ACF(Beer, lag_max = 50) |>                        # this will give a tsibble df with lags and acf (And autoplot will
+                                        # plot it accordingly)
+  autoplot() + 
+  labs(title = "Australian Beer Production")
+  
+  
+
+```
+* peaks in 4 quarters and troughs too.
+* dashed blue line -> if correlations are significantly differente from 0 or not. "Bartlett Bands"
+
+```{r trend and seasonality in ACF}
+
+a10
+str(a10)    #  3 monthly seasonal
+
+
+a10 |>
+  feasts::ACF(Cost, lag_max = 50) |>
+  autoplot() +
+  labs(title="ACT Anti")
+
+
+
+```
+ <!-- exponentially decreasing acf with peaks at every 12 months apart..better check the PACF plots too.  -->
+
+```{r drawing PACF}
+a10 |>
+  feasts::PACF(Cost, lag_max = 50) |>
+  autoplot() +
+  labs(title="ACT Anti")
+
+```
+
+
+```{r White Noise}
+set.seed(3)
+y <- tsibble(
+  sample = 1:50,
+  wn = rnorm(50),
+  index = sample
+)
+
+y 
+
+y |> autoplot(wn) +
+  labs(title = "White Noise", y = "")               # y = "" removes label from y axis
+
+
+y |>
+  ACF(wn) |>
+  autoplot() + labs(title="White Noise ACF")
+
+
+```
+
+## Time Series Decomposition
+
+```{r transformation and adjustment}
+
+global_economy
+
+str(global_economy)
+
+tsibbledata::global_economy |>
+  filter(Country == "Australia") |>
+  autoplot(GDP/Population) +
+  labs(title = "GDP per capita", y="$US")
+
+
+global_economy
+
+str(global_economy)
+
+tsibbledata::global_economy |>
+  filter(Country == "India") |>
+  autoplot(GDP/Population) +
+  labs(title = "GDP per capita", y="$US")
+
+```
+
+
+```{r inflation price adjustments}
+
+print_retail <- aus_retail |>
+  filter(Industry == "Newspaper and book retailing") |>
+  group_by(Industry) |>
+  index_by(Year = year(Month)) |>
+  summarise(Turnover = sum(Turnover))  # |> mutate(Industry = "Newspaper and book retailing")
+
+print_retail              # newspaper printing turnover data over years
+  
+aus_economy <- global_economy |>
+  filter(Code == "AUS")
+
+aus_economy               # australian economy data oer years including CPI
+
+# both have different years and also we need to mathc data for years so we perform left join to have consistent data
+
+print_retail |>
+  left_join(aus_economy, by = "Year") |> 
+  mutate(`Inf. Adjusted Turnover` = Turnover/CPI * 100) # |>
+  #pivot_longer(c(Turnover, `Inf. Adjusted Turnover`),
+   #            values_to = "Turnover")
+print_retail
+
+```
 
 
 ```{r}
 
+print_retail |>
+  left_join(aus_economy, by = "Year") |> 
+  mutate(`Inf. Adjusted Turnover` = Turnover/CPI * 100) |>
+  pivot_longer(c(Turnover, `Inf. Adjusted Turnover`), # by long format we create a column with name "name" and values given in this vector, we can remname the coum too, using names_to = `Turnover Type`
+              values_to = "Turnover") |>  # turnover is just a name of new column
+  mutate(name=factor(name, 
+                     levels=c('Turnover', 'Inf. Adjusted Turnover'))) |>
+  ggplot(aes(x = Year, y = Turnover)) +
+  geom_line() + 
+  facet_grid(name ~ ., scales = "free_y") +
+  labs(title = "Turnover: Australian print media industry",
+       y = "$AU")
+  
+  
+print_retail
+
+
+```
+
+
+Box COX Transformation (allows for negative values which log transform doesn't) (also helps in converting data to normal form (not always))
+    
+      |
+      | log(Yt)      if λ = 0  (for log 0, ie. zero remainss zero)
+Wt =  | 
+      | ((sign(Yt)/Yt)^(λ) - 1) / λ        else
+      | OR 
+      | (Yt)^(λ) - 1) / λ)                  # variation neeeds to know difference
+      
+A good value of  λ  is one which makes the size of the seasonal variation about the same across the whole series, as that makes the forecasting model simpler.
+      
+```{r BoX Cox Transformation & guerrero feature}
+
+# lambda is found using guerrero feature
+
+aus_production |>
+  autoplot(Gas)
+
+lambda <- aus_production |>
+  fabletools::features(Gas, features = guerrero) |>
+  pull(lambda_guerrero)
+
+
+aus_production |>
+  autoplot(box_cox(Gas, lambda)) +
+  labs(y = "",
+       title = latex2exp::TeX(paste0(
+         "Transformed gas production with $\\lambda$ = ",
+         round(lambda,2))))
+
+
+
+```
+
+```{r Time series components, STL decomposition}
+
+fpp3::us_employment # monthly seasonal with Series_ID as having 148 different series data
+
+us_retail_employment <- us_employment |>
+  filter(year(Month) >= 1990, Title == 'Retail Trade') |> # title named coumn with valeus being Retail Trade
+  select(-Series_ID)
+
+us_retail_employment
+
+autoplot(us_retail_employment,Employed)+
+  labs(y = "Persons (thousands)",
+       title = "Total Employment in US Retail")
+
+
+```
+<!-- # looks to have trend and some seasonality maybe ? let's divide into parts and check | -->
+
+```{r decomposition}
+
+dcmp <- us_retail_employment |>
+  fabletools::model(
+                    stl = STL(Employed)
+                    )
+fabletools::components(dcmp)
+
+str(components(dcmp))
+
+```
+
+<!-- The output above shows the components of an STL decomposition. -->
+
+```{r}
+
+components(dcmp) |>
+  as_tsibble() |>                                                 # components(dcmp) is a dataframe so need to                                                                         # convert to tsibble
+  autoplot(Employed, colour="pink") +
+  geom_line(aes(y=trend), colour="darkgreen") +
+  labs(
+    y = "Persons (k)",
+    title = "Total Employment in US Retail"
+  )
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
 ```
 
 
