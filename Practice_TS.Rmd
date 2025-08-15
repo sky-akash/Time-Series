@@ -1382,62 +1382,483 @@ outliers |>
   labs(title = "Outlying time series in PC space")
 
 ```
+### Forecaster's Toolbox
+
+To illustrate the process, we will fit linear trend models to national GDP data stored in global_economy.
+
+```{r tidy forecasting window}
+
+# Data preparation (tidy)
+
+tsibbledata::global_economy
+
+gdppc <- tsibbledata::global_economy |>
+  dplyr::mutate(GDP_per_capita = GDP/Population)
+
+gdppc
+
+# Plotting for visaulization (1 country here) sweden
+
+gdppc |>
+  filter(Country == "Sweden") |>
+  autoplot(GDP_per_capita) +
+  labs(y="$US", title = "GDP per capita of Sweden")
+  
+###################################################################################
+# Model specification
+
+# a lot of available models to choose from 
+# Models in fable are specified using model functions, which each use a formula (y ~ x) interface. 
+
+########################## TSLM(GDP_per_capita ~ trend()) #########################
+
+# In this case the model function is TSLM() (time series linear model), the response variable is GDP_per_capita and it is being modelled using trend() (a “special” function specifying a linear trend when it is used within TSLM()). We will be taking a closer look at how each model can be specified in their respective sections.
+# 
+###################################################################################
+
+# Training model estiamting :)
+
+fit <- gdppc |>
+  model(trend_model = TSLM(GDP_per_capita ~ trend()))
+
+fit
 
 
-```{r}
+# Model performance (evaluation)
+
+# for that we will use diagnostics (later)
+
+# Forecasts
+#
+######### produce the forecasts using forecast()
+
+fit |> forecast(h = "3 years")
+
+
+# plotting forecasts
+
+fit |>
+  forecast(h = "3 years") |>
+  filter(Country == "Sweden") |>
+  autoplot(gdppc) +
+  labs(y = "$US", title = "GDP per capita for Sweden")
+
+
+```
+
+
+```{r forecasting methods}
+
+# just model syntaxes here
+
+# 4 simple benchmarking methods :)
+# 1. Mean Method
+# 2. naive Forecast
+# 3. Seasonal Naive
+# 4. Drift 
+
+aus_production
+
+# going for bricks production data
+
+bricks <- aus_production|>
+  filter_index("1970 Q1" ~ "2004 Q4") |>
+  select(Bricks)
+bricks
+
+# going for beer data too
+
+beer <- aus_production |>
+  filter_index("1970 Q1" ~ "2004 Q4") |>
+  select(Beer)
+beer
+
+# 1. Mean Method
+bricks |> fabletools::model(MEAN(Bricks))
+beer |> fabletools::model(MEAN(Beer))
+
+
+# 2. naive Forecast
+bricks |> model(NAIVE(Bricks))
+beer |> model(NAIVE(Beer))
+
+bricks |> model(RW(Bricks))
+
+# a naïve forecast is optimal when data follow a random walk (Section 9.1), 
+# these are also called random walk forecasts and the RW() function can be used instead of NAIVE
+
+# 3. Seasonal Naive
+bricks |> model(SNAIVE(Bricks ~ lag("year")))
+# The lag() function is optional here as bricks is quarterly data and so a seasonal naïve method will need a one-year lag.
+
+
+# 4. Drift 
+bricks |> model(RW(Bricks ~ drift()))
+
 
 ```
 
 
 ```{r}
+# fitting proper models with forecasts (for Beer)
+
+# Set training data from 1970 to 2006
+train <- aus_production |>
+  filter_index("1970 Q1" ~ "2004 Q4") |>
+  select(Beer)
+
+# Fit the Model
+beer_fit <- train |>
+  model(
+    Mean = MEAN(Beer),
+    NAIVE = NAIVE(Beer),
+    SNAIVE = SNAIVE(Beer),            # The lag special is used to specify the lag order for the                                          random walk process. If left out, this special will                                               automatically be included.
+    DRIFT = RW(Beer ~ drift())
+    
+  )
+
+# generating forecasts for 14 quarters
+
+beer_fc <- beer_fit |> 
+  forecast(h=30)
+
+# Plotting forecasts
+beer_fc |> 
+  autoplot(train, level=NULL) +              # level is for confidence interval, can accpt vector (def. 85 - 90%)
+  autolayer(
+    filter_index(aus_production, "2004 Q1" ~ .),
+    colour = "Black"
+  ) + 
+  labs(
+    y = "Mega L",
+    title = "Forecasts for Quarterly Beer Production"
+  ) +
+  guides(
+    colour = guide_legend(title="Forecast")
+  )
+
+
+
+```
+
+
+```{r Google’s daily closing stock price}
+
+# Re-index based on trading days
+
+# ?gafa_stock # Historical stock prices from 2014-2018 for Google, Amazon, Facebook and Apple ($USD).
+
+google_stock <- gafa_stock |>
+  filter(Symbol == "GOOG", year(Date) >= 2015)|>
+  mutate(day = dplyr::row_number()) |>
+  update_tsibble(index = day, regular = TRUE)
+
+
+# Filter the year of interest
+google_2015 <- google_stock |> filter(year(Date) == 2015)
+
+
+# Fit the models
+google_fit <- google_2015 |>
+  model(
+    Mean = MEAN(Close),
+    Naive = NAIVE(Close),
+    Drift = NAIVE(Close ~ drift())
+  )
+
+
+# Produce forecasts for the trading days in January 2016
+
+google_jan_2016 <- google_stock |>
+  filter(yearmonth(Date) == yearmonth("2016 Jan"))       # for january forecasts only
+
+google_fc <- google_fit |>
+  forecast(new_data = google_jan_2016)
+
+################################################################################
+# Note :::::::::::::::
+# 
+# Forecast using new_data: 
+# This is used when you want to forecast specific future time points, especially if:
+# Your time series is irregular (like stock market data — only trading days).
+# 
+# You want forecasts for custom dates (not just the next h steps).
+############
+#             forecast(model, new_data = some_data)
+############
+# "some_data" must be a "data frame" or "tsibble" that includes the future time points you want forecasts for.
+# 
+# You manually provide the time index (like dates) for which you want forecasts.
+# se when time is irregular or you want to forecast specific dates.
+#
+################################################################################
+
+
+# Plot the forecasts
+google_fc |>
+  autoplot(google_2015, level = NULL) +
+  autolayer(google_jan_2016, Close, colour = "black") +
+  labs(y = "$US",
+       title = "Google daily closing stock prices",
+       subtitle = "(Jan 2015 - Jan 2016)") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+```
+
+
+```{r fitted values and residuals}
+
+# Augment - apply augment() to this object to compute the fitted values and residuals for all models.
+
+augment(beer_fit)
+
+################################################################################
+#
+# There are three new columns added to the original data:
+#
+# .fitted contains the fitted values;
+# .resid contains the residuals;
+# .innov contains the “innovation residuals” which, in this case, are identical to the regular residuals.
+# 
+################################################################################
+
+# #################################################################################
+# # Note: 
+# 
+# Residuals are useful in checking whether a model has adequately captured the information in the data. For this purpose, we use innovation residuals.
+# 
+# If patterns are observable in the innovation residuals, the model can probably be improved. We will look at some tools for exploring patterns in residuals in the next section.
+# 
+# #################################################################################
+
+```
+
+##### Residual diagnostics
+
+```{r}
+# good forecasting
+### uncorrelated inoovation residuals
+### zero mean of innov. residuals
+
+# Further good/ useful to have ->
+# constant variance on innov resid 
+# innov. resid. normally distributed
+# 
+
+# Forecasting Google daily closing stock prices
+autoplot(google_2015, Close) +
+  labs(y = "$US",
+       title = "Google daily closing stock prices in 2015")
+
+# The following graph shows the Google daily closing stock price for trading days during 2015. The large jump corresponds to 17 July 2015 when the price jumped 16% due to unexpectedly strong second quarter results
+
+
+
+aug <- google_2015 |>
+  fabletools::model(NAIVE(Close)) |>
+  augment()                           # to get residual data
+autoplot(aug, .innov) +
+  labs(y = "$US",
+       title = "Residuals from the naïve method")
+
+
+# hostogram
+
+aug |>
+  ggplot(aes(x = .innov)) +
+  geom_histogram() +
+  labs(title = "Histogram of residuals")
+
+# ACF
+aug |>
+  feasts::ACF(.innov) |>
+  autoplot() +
+  labs(title = "Residuals from the naïve method")
+
+
+
+
+```
+Easy way by single function -> gg_tsresiduals()
+
+```{r}
+
+google_2015 |>
+  model(NAIVE(Close)) |>
+  gg_tsresiduals()
+
+```
+
+
+```{r Portmanteau tests for autocorrelation}
+
+# A test for a group of autocorrelations is called a portmanteau test
+
+# Box-Pierce
+aug |> features(.innov, box_pierce, lag = 10)
+
+# Ljung Box
+aug |> features(.innov, ljung_box, lag = 10)
+
+# 
+# p-value > 0.05 -> For both  
+# Q and Q∗, the results are not significant (i.e., the  p-values are relatively large).
+# Thus, we can conclude that the residuals are not distinguishable from a white noise series
+
+# Box-Pierce 
+# 
+# NUll : Ho : a time series is white noise
+#        so, if p-value<0.05 -> Reject NUll i.e. it is white noise...meaning It is not White Noise
+#       Now, for p-value > 0.05 -> The series is Almost White Noise (NUll cannot be rejected)
+# 
 ```
 
 
 ```{r}
+# Drift Method
+
+# An alternative simple approach that may be appropriate for forecasting the Google daily closing stock price is the drift method. The tidy() function shows the one estimated parameter, the drift coefficient, measuring the average daily change observed in the historical data.
+
+
+fit <- google_2015 |> model(RW(Close ~ drift()))
+
+augment(fit) |> features(.innov, ljung_box, lag=10)
+
+# As with the naïve method, the residuals from the drift method are indistinguishable from a white noise series.
+
+```
+
+
+```{r Forecast distributions + Prediction Intervals}
+
+# #####################################################################################################
+# 
+#  hilo():    The hilo() function converts the forecast distributions into intervals.
+#             By default, 80% and 95% prediction intervals are returned, although 
+#             other options are possible via the level argument
+# 
+# #####################################################################################################
+
+google_2015 |>
+  model(NAIVE(Close)) |>
+  forecast(h = 10) |>
+  hilo()
+
+# No level
+google_2015 |>
+  model(NAIVE(Close)) |>
+  forecast(h = 10) |>
+  autoplot(google_2015, level=NULL) +                           # default level is 80 and 95%
+  labs(title="Google daily closing stock price", y="$US" )
+
+# level by default
+google_2015 |>
+  model(NAIVE(Close)) |>
+  forecast(h = 10) |>
+  autoplot(google_2015) +
+  labs(title="Google daily closing stock price", y="$US" )
+
+# passing levels
+google_2015 |>
+  model(NAIVE(Close)) |>
+  forecast(h = 10) |>
+  autoplot(google_2015, level=c(85, 90, 95, 99)) +
+  labs(title="Google daily closing stock price", y="$US" )
+
+
+```
+#### Prediction Interval fro mBootstrapped Samples
+
+When a normal distribution for the residuals is an unreasonable assumption, one alternative is to use bootstrapping, which only assumes that the residuals are uncorrelated with constant variance
+
+```{r Prediction Interval fro mBootstrapped Samples}
+
+fit <- google_2015 |>
+  model(NAIVE(Close))
+
+simulate <- fit |> generate(h = 30, times = 5, bootstrap = TRUE)
+simulate
+
+# Here we have generated five possible sample paths for the next 30 trading days. The .rep variable provides a new key for the tsibble.
+
+# we generated 5 sample paths so have index of values for each path too
+
+google_2015 |>
+  ggplot(aes(x = day)) +
+  geom_line(aes(y = Close)) +
+  geom_line(
+    data = simulate,
+    aes(y = .sim, colour = as.factor(.rep))) +
+  labs(title="Google daily closing stock price", y="$US" ) +
+  guides(colour = "none")
+
+
+```
+#### Shortcut for bootstrap (in forecast())
+
+```{r}
+
+fc <- fit |> forecast(h = 30, bootstrap = TRUE)
+fc
+
+# but now we have 5000 sample paths :)
+
+autoplot(fc, google_2015) +
+  labs(title="Google daily closing stock price", y="$US" )
+
+# note how smart autoplot is here :)
+
 ```
 
 
 ```{r}
+
+fc1000 <- 
+  google_2015 |>
+  model(NAIVE(Close)) |>
+  forecast(h = 10, bootstrap = TRUE, times = 1000) |>
+  hilo()
+
+str(fc1000$.mean)
+
+# 
+# autoplot(fc1000, google_2015)+
+#   labs(title = "Google daily stock closing price", y = "$US")
+# Plot won't work with hilo here ..........
+# 
+# autoplot() tries to plot .mean (which is length 10) but also tries to handle those new hilo interval columns.
+# 
+# Since those intervals are stored as list objects, ggplot2 fails when mapping aesthetics because it expects numeric vectors, not lists.
+# 
+# This leads to the error about aesthetics length mismatch.
+
 ```
 
 
-```{r}
-```
+```{r Forecasting with transformations}
+
+prices # commodity prices
+
+fc <- prices |>
+  filter(!is.na(eggs)) |>                  # removing NA
+  model(RW(log(eggs) ~ drift())) |>        # log transfrom of prices and a drift model
+  forecast(h = 50) |>                      # forecast for 50 horizons
+  mutate(.median = median(eggs))           # new column with median value of eggs from the distribution in new fc
+
+fc
+
+fc |>
+  autoplot(prices |> filter(!is.na(eggs)), level = c(80, 90, 95)) +
+  geom_line(
+    aes(y = .median),
+    data = fc,
+    linetype = 2,
+    col = "blue") +
+  labs(title = "Annual egg prices",
+       y = "$US (in cents adjusted for inflation) ")
 
 
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
 ```
 
 
