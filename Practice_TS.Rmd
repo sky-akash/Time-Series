@@ -2577,37 +2577,268 @@ Regressing non-stationary time series can lead to spurious regressions. The outp
 
 The innovation residuals are not white noise...so not a model we are looking for.
 
+###### Some useful predictors
+
 ```{r}
+# Some useful predictors
+
+# just australian beer production data and plot 
+recent_production <- aus_production |>
+  filter(year(Quarter) >= 1992)
+recent_production |>
+  autoplot(Beer) +
+  labs(y = "Megalitres",
+       title = "Australian quarterly beer production")
+
+# forecasting value of future beer production. We can model this data using a regression model with a linear trend and quarterly dummy variables,
+
+# i.e. Forecast ~ Linear Trend (regression) + Quarter Dummies
+
+fit_beer <- recent_production |>
+  model(TSLM(Beer ~ trend() + season()))           # just added seaspn (takes in season automatically)
+
+# Note that trend() and season() are not standard functions; they are “special” functions that work within the TSLM() model formulae.
+
+report(fit_beer)
+
+# Fitted values
+
+augment(fit_beer) |>
+  ggplot(aes(x = Quarter)) +
+  geom_line(aes(y = Beer, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  scale_colour_manual(
+    values = c(Data = "black", Fitted = "#D55E00")
+  ) +
+  labs(y = "Megalitres",
+       title = "Australian quarterly beer production") +
+  guides(colour = guide_legend(title = "Series"))
+
+
+# actual vs fitted
+augment(fit_beer) |>
+  ggplot(aes(x = Beer, y = .fitted,
+             colour = factor(quarter(Quarter)))) +
+  geom_point() +
+  labs(y = "Fitted", x = "Actual values",
+       title = "Australian quarterly beer production") +
+  geom_abline(intercept = 0, slope = 1) +
+  guides(colour = guide_legend(title = "Quarter"))
+
+```
+
+###### Intervention variables -->
+<!-- # necessary to model interventions that may have affected the variable to be forecast. For example, competitor activity, advertising expenditure, industrial action, and so on, can all have an effect. -->
+<!-- #  -->
+<!-- # When the effect lasts only for one period, we use a “spike” variable. This is a dummy variable that takes value one in the period of the intervention and zero elsewhere. A spike variable is equivalent to a dummy variable for handling an outlier. -->
+<!-- #  -->
+<!-- # Other interventions have an immediate and permanent effect. If an intervention causes a level shift (i.e., the value of the series changes suddenly and permanently from the time of intervention), then we use a “step” variable. A step variable takes value zero before the intervention and one from the time of intervention onward. -->
+<!-- #  -->
+<!-- # Another form of permanent effect is a change of slope. Here the intervention is handled using a piecewise linear trend; a trend that bends at the time of intervention and hence is nonlinear. We will discuss this in Section 7.7. -->
+
+Trading days
+Distributed lags
+Easter
+
+###### Fourier series
+These Fourier terms are produced using the fourier() function. For example, the Australian beer data can be modelled like this.
+
+```{r}
+
+fourier_beer <- recent_production |>
+  model(TSLM(Beer ~ trend() + fourier(K = 2)))
+
+report(fourier_beer)
+
+################################                                              ################################
+#
+# The K argument to fourier() specifies how many pairs of sin and cos terms to include. The maximum allowed is  
+#                                         K = m / 2  where m is the seasonal period
+################################                                              ################################
+
+```
+######  Selecting predictors
+
+.................... adj_r_squared | CV | AIC | AICc | BIC ....................
+
+.................... Best subset regression
+.................... Stepwise regression
+.............................. Backward
+.............................. Forward
+.............................. Hybrid 
+....................Beware of inference after selecting the predictors (we are forecasting not inferencing :)
+....................
+
+....................       using glance() function         ....................
+
+```{r}
+
+fit_consMR
+residuals(fit_consMR)
+
+glance(fit_consMR) |>
+  select(adj_r_squared, CV, AIC, AICc, BIC)
 
 
 ```
 
+###### Forecasting with regression
+
+```{r Forecasting with regression}
+# Ex-ante versus ex-post forecasts
+
+aus_production
+
+recent_production <- aus_production |>
+  filter(year(Quarter) >= 1992)
+recent_production
+
+fit_beer <- recent_production |>
+  model(TSLM(Beer ~ trend() + season()))      # trend (for time variable) + season
+fit_beer
+
+fc_beer <- forecast(fit_beer)                 # forecast for default horizon
+
+
+fc_beer |>
+  autoplot(recent_production) +
+  labs(
+    title = "Forecasts of beer production using regression",
+    y = "megalitres"
+  )
+
+
+```
+###### Scenario based forecasting
+
+```{r Scenario based forecasting}
+
+us_change
+
+fit_consBest <- us_change |>
+  model(
+    lm = TSLM(Consumption ~ Income + Savings + Unemployment)
+  )
+
+fit_consBest
+
+future_scenarios <- scenarios(              # creating new data for which to forecast
+
+  Increase = new_data(us_change, 4) |>
+    mutate(Income=1, Savings=0.5, Unemployment=0),
+                                                    # new_data(your_tsibble, n)
+                                                    # your_tsibble = your original data (must be a tsibble with a                                                      # time index)
+                                                    # n = number of future time points you want to create
+  Decrease = new_data(us_change, 4) |>
+    mutate(Income=-1, Savings=-0.5, Unemployment=0),
+  names_to = "Scenario")
+future_scenarios
+
+fc <- forecast(fit_consBest, new_data = future_scenarios)
+fc
+
+us_change |>
+  autoplot(Consumption) +
+  autolayer(fc) +
+  labs(title = "US consumption", y = "% change")
+
+```
+###### Building a predictive regression model
+####### Prediction intervals
+
 
 ```{r}
+
+us_change
+
+fit_cons <- us_change |>
+  model(TSLM(Consumption ~ Income))
+fit_cons
+
+new_cons <- scenarios(
+  "Average increase" = new_data(us_change, 4) |>
+    mutate(Income = mean(us_change$Income)),
+  "Extreme increase" = new_data(us_change, 4) |>
+    mutate(Income = 12),
+  names_to = "Scenario"
+)
+
+new_cons
+
+fcast <- forecast(fit_cons, new_cons)
+fcast
+
+
+us_change |>
+  autoplot(Consumption) +
+  autolayer(fcast) +
+  labs(title = "US consumption", y = "% change")
+
 ```
 
+###### Nonlinear regression
 
 ```{r}
+# Non-linear trend
+
+boston_marathon
+
+boston_men <- boston_marathon |>
+  filter(Year >= 1924) |>
+  filter(Event == "Men's open division") |>
+  mutate(Minutes = as.numeric(Time)/60)
+
+boston_men
+
+##################################################
+##################################################
+##################################################
+##################################################
+
+# # piecewise linear - One of the simplest specifications is to make  f   piecewise linear. That is, we introduce points where the slope of  f   can change. These points are called knots. This can be achieved by letting  
+# x1=x  and introducing variable  x2  such that
+
+# The notation  (x−c)+  means the value  x−c  if it is positive and 0 otherwise. This forces the slope to bend at point  c. Additional bends can be included in the relationship by adding further variables of the above form.
+
+
+
+fit_trends <- boston_men |>
+  model(
+    linear = TSLM(Minutes ~ trend()),                                 # linear Model
+    exponential = TSLM(log(Minutes) ~ trend()),                       # Exponential | Log model
+    piecewise = TSLM(Minutes ~ trend(knots = c(1950, 1980)))          # piecewise linear
+  )
+fit_trends
+
+fc_trends <- fit_trends |> forecast(h = 10)                           # forecasting 10 horizons
+fc_trends
+
+boston_men |>
+  autoplot(Minutes) +
+  geom_line(data = fitted(fit_trends),
+            aes(y = .fitted, colour = .model)) +
+  autolayer(fc_trends, alpha = 0.5, level = 95) +
+  labs(y = "Minutes",
+       title = "Boston marathon winning times")
+
+
+
 ```
+# The best forecasts appear to come from the piecewise linear trend.
+
+###### Correlation, causation and forecasting
+
+```{r Correlation, causation and forecasting}
+
+# Correlation, causation and forecasting
+
+# Correlation is not causation
+
+# Forecasting with correlated predictors
+
+# Multicollinearity and forecasting
 
 
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
 ```
 
 
