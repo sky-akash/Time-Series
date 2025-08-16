@@ -1862,6 +1862,755 @@ fc |>
 ```
 
 
+```{r Forecasting with decomposition}
+
+# example - Employment in the US retail sector
+
+us_employment
+
+us_employment |>
+  filter(
+    year(Month) >= 1990, Title =="Retail Trade") -> us_retail_employment
+  
+dcmp <- us_retail_employment |>
+  model(STL(Employed ~ trend(window=7), robust = TRUE)) |>
+  components() |>
+  select(-.model)
+# |>
+#   autoplot(trend)
+
+dcmp
+
+##########################################################################################
+##########################################################################################
+##########################################################################################
+
+dcmp |>
+  model(NAIVE(season_adjust)) |>
+  forecast() |>
+  autoplot(dcmp) +
+  labs(y = "Number of people",
+       title = "US retail employment")
+
+
+#########################################################################################
+#########################################################################################
+#########################################################################################
+
+#                              Easy Version                                             #
+                      
+#                          decomposition_model()                                        #
+
+# allows  computation of forecasts via any additive decomposition, 
+# using other model functions to forecast each of the decomposition’s components.
+# 
+# Seasonal components of the model will be forecast automatically using SNAIVE() if
+# a different model isn’t specified.
+# The function will also do the reseasonalising for, ensuring
+# that the resulting forecasts of the original data are obtained. 
+
+fit_dcmp <- us_retail_employment |>
+  model(stlf = decomposition_model(
+    STL(Employed ~ trend(window=7), robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+
+fit_dcmp |> 
+  forecast() |>                     # by default uses the same period of forecast as the seasonal period
+  autoplot(us_retail_employment) + 
+  labs(
+    y = "Number of people",
+    title = "US retail Employment"
+  )
+
+# If your data is monthly, it forecasts the next 12 periods (i.e., 12 months).
+# If it's quarterly, then 4 periods (1 year).
+# If it's weekly, then 52 periods.
+
+fit_dcmp |> gg_tsresiduals()
+
+
+
+#########################################################################################
+#########################################################################################
+#########################################################################################
+#########################################################################################
+```
+
+
+```{r Evaluating point forecast accuracy}
+# Subset of time series 
+
+aus_production |> 
+  filter(year(Quarter) >= 1995)
+
+
+aus_production |>
+  filter_index("1995 Q1" ~ .) # all data from 1995 Q1
+
+# Slice -------------------- 
+# allows the use of indices to choose a subset from each group. For example,
+aus_production |>
+  slice((n()-19):n())       # extracts the last 20 observations (5 years).
+# or slice(n()-19:0)
+# means last 20 obs
+
+# slicing with groups
+aus_retail |>
+  group_by(State, Industry) |>
+  slice(1:12)                              # selects the first 12 rows from each group.
+
+
+```
+
+
+```{r Forecast errors}
+
+recent_production <- aus_production |>
+  filter(year(Quarter) >= 1992)
+
+beer_train <- recent_production |>
+  filter(year(Quarter) <= 2007)
+
+beer_fit <- beer_train |>
+  model(
+    Mean = MEAN(Beer),
+    `Naïve` = NAIVE(Beer),
+    `Seasonal naïve` = SNAIVE(Beer),
+    Drift = RW(Beer ~ drift())
+  )
+
+beer_fc <- beer_fit |>
+  forecast(h = 10)
+
+beer_fc |>
+  autoplot(
+    aus_production |> filter(year(Quarter) >= 1992),
+    level = NULL
+  ) +
+  labs(
+    y = "Megalitres",
+    title = "Forecasts for quarterly beer production"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+
+```
+
+Accuracy
+
+```{r}
+
+# The accuracy() function will automatically extract the relevant periods from
+# the data (recent_production in this example) to match the forecasts when 
+# computing the various accuracy measures.
+
+accuracy(beer_fc, recent_production)
+
+
+
+```
+
+
+```{r Non-Seasonal Example}
+
+google_fit <- google_2015 |>
+  model(
+    Mean = MEAN(Close),
+    `Naïve` = NAIVE(Close),
+    Drift = RW(Close ~ drift())
+  )
+
+google_fc <- google_fit |>
+  forecast(google_jan_2016)
+
+google_fc |>
+  autoplot(bind_rows(google_2015, google_jan_2016),
+    level = NULL) +
+  labs(y = "$US",
+       title = "Google closing stock prices from Jan 2015") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+accuracy(google_fc, google_stock)
+
+
+
+```
+
+
+```{r Evaluating distributional forecast accuracy}
+
+# Quantile scores
+
+google_fc # forecasted data df
+
+google_fc |>
+  filter(.model == "Naïve") |>
+  autoplot(bind_rows(google_2015, google_jan_2016), level=80)+
+  labs(y = "$US",
+       title = "Google closing stock prices")
+
+
+google_fc |>
+  filter(.model == "Naïve", Date == "2016-01-04") |>
+  accuracy(google_stock, list(qs=quantile_score), probs=0.10)
+
+
+
+# Winkler Score
+
+google_fc |>
+  filter(.model == "Naïve", Date == "2016-01-04") |>
+  accuracy(google_stock,
+    list(winkler = winkler_score), level = 80)
+
+
+# COnt ranked probability
+google_fc |>
+  accuracy(google_stock, list(crps = CRPS))
+
+
+#####
+google_fc |>
+  accuracy(google_stock, list(skill = skill_score(CRPS)))
+
+```
+
+
+```{r Time series cross-validation}
+################################################################################
+################################################################################
+################################################################################
+                          # 
+                          # Growing Window
+                          # Sliding Window ?
+                          # Rolling Window ?
+                          # 
+                          # 
+################################################################################
+################################################################################
+################################################################################
+
+
+# Growing window function used for time series cross-validation #
+
+# The stretch_tsibble() function is used to create many training sets. 
+# In this example, we start with a training set of length .init=3, and 
+# increase the size of successive training sets by .step=1
+
+
+google_2015_tr <- google_2015 |>
+
+  tsibble::stretch_tsibble(.init = 3, .step = 1) |>        # Growing window function used for time series cross-validation
+  
+  relocate(Date, Symbol, .id)                     # reorders columns, putting Date, Symbol, and .id first in the                                                       output for easier reading
+google_2015_tr
+
+# .id with sequence numbers tell which are used in training iterations... so technically it is making redundant copies of data here..
+
+
+
+# other functions ::::::
+# slide_tsibble() :::::: - Perform Sliding Window
+# tile_tsibble()  :::::: - Perform Tilling Window
+
+
+# slide_tsibble(.x, .size = 1, .step = 1, .id = ".id")
+# Arguments
+# .x	 -  # A tsibble.
+# 
+# .size	- #  A positive integer for window size.
+# 
+# .step	- # A positive integer for calculating at every specified step instead of every single step.
+# How far to move forward each time.
+# 
+# .id	  - # A character naming the new column .id containing the partition.
+# Name of the new column that stores which window each row came from.
+#
+
+#  slide_tsibble(), tile_tsibble(), and stretch_tsibble() provide fast and shorthand for rolling over a tsibble by observations. That said, if the supplied tsibble has time gaps, these rolling helpers will ignore those gaps and proceed.
+# They are useful for preparing the tsibble for time series cross validation. They all return a tsibble including a new column .id as part of the key. The output dimension will increase considerably with slide_tsibble() and stretch_tsibble(), which is likely to run out of memory when the data is large.
+
+
+### AN Additional Example ###
+
+# harvest <- tsibble(
+#   year = rep(2010:2012, 2),
+#   fruit = rep(c("kiwi", "cherry"), each = 3),
+#   kilo = sample(1:10, size = 6),
+#   key = fruit, index = year
+# )
+# harvest %>%
+#   slide_tsibble(.size = 2)
+
+
+# Notice the use of key... helps generate separate time series for each key values
+
+
+
+#####################################################################################
+###                          
+###                          Tile Tsibble
+###                          
+###             Partitions your time series into 
+###             non-overlapping tiles (chunks) of
+###             size .size, within each key group.
+###          
+###          it jumps ahead by .size rows each time
+###         (i.e., it skips rows and avoids overlaps).     
+###             
+###                          
+#####################################################################################
+
+# Usage
+# tile_tsibble(.x, .size = 1, .id = ".id")
+# Arguments
+# .x	
+# A tsibble.
+# 
+# .size	
+# A positive integer for window size.
+# 
+# .id	
+# A character naming the new column .id containing the partition.
+
+# 
+# tile_tsibble(.size = 2)
+# 
+# This splits each fruit's time series into non-overlapping chunks (tiles) of 2 rows:
+# 
+# For kiwi:
+# 
+# Tile 1: 2010, 2011
+# 
+# Tile 2: 2012
+# 
+# For cherry:
+# 
+# Tile 1: 2010, 2011
+# 
+# Tile 2: 2012
+
+
+```
+
+
+```{r Accuracy function}
+#  The accuracy() function can be used to evaluate the forecast accuracy across the training sets.
+
+google_2015_tr
+
+# TSCV accuracy
+google_2015_tr |>
+  model(RW(Close ~ drift())) |>              # drift-model
+  forecast(h = 1) |>                         # 1-step ahead forecast
+  accuracy(google_2015)     # (Automaticlly takes care of Keys-Match_data & Calc. Accuracy)
+
+#?accuracy
+
+# Training set accuracy
+google_2015 |>
+  model(RW(Close ~ drift())) |>
+  accuracy()
+
+####################################################################################################
+####################################################################################################
+
+# As expected, the accuracy measures from the residuals are smaller, as the corresponding “forecasts” are based on a model fitted to the entire data set, rather than being true forecasts.
+ 
+# A good way to choose the best forecasting model is to find the model with the smallest RMSE computed using time series cross-validation.
+
+####################################################################################################
+####################################################################################################
+
+```
+
+###### Forecast horizon accuracy with cross-validation
+```{r forecasting performance of 1- to 8-step-ahead drift forecasts}
+
+google_2015
+
+google_2015_tr <- google_2015 |>
+  tsibble::stretch_tsibble(
+    .init = 3,
+    .step = 1
+  )
+
+google_2015_tr
+
+fc <- google_2015_tr |>
+  model(
+    RW(Close ~ drift())
+  ) |>
+  forecast(h=8) |>
+  group_by(.id) |>
+  mutate(h = row_number()) |>
+  ungroup() |>
+  as_fable(response = "Close", distribution = Close)
+
+fc
+
+# as_fable() is used to construct a fable (forecast table) from a tsibble and forecast distribution
+
+
+# This helps you see how forecast error increases (or decreases) over longer forecast horizons.
+# Accuracy calculation over the different horizons
+
+fc |>
+  accuracy(google_2015, by = c("h", ".model")) |>
+  ggplot(aes(x = h, y = RMSE)) +
+  geom_point()
+
+
+```
+
+## Time Series Regression Models
+#### The linear model
+
+```{r}
+# US consumption expenditure
+
+us_change
+
+colnames(us_change)
+str(us_change)
+
+us_change |>
+  tidyr::pivot_longer(
+    c(Consumption, Income),
+    names_to="Series") |>
+  autoplot(value) +
+  labs(y = "% change")
+
+# model
+
+us_change |>
+  ggplot(
+    aes(x = Income,
+        y = Consumption)) +
+  
+  labs(y = "Consumption (quarterly % change)",
+       x = "Income (quarterly % change)") +
+  
+  geom_point() +
+  
+  geom_smooth(method = "lm", se = FALSE)           # lineary regression line
+
+
+```
+##### using TSLM
+
+```{r using TSLM}
+
+us_change |>
+  model(TSLM(Consumption ~ Income)) |>
+  report()                                     
+
+```
+
+#### Multiple linear regression
+
+```{r}
+
+us_change
+
+us_change |>
+  select(-Consumption, -Income)
+
+us_change |>
+  select(-Consumption, -Income) |>
+  pivot_longer(-Quarter)    # same as pivot_longer(cols = !Quarter) | Keeps Quarter col, and pivot everything else
+
+us_change |>
+  select(-Consumption, -Income) |>
+  pivot_longer(-Quarter) |>
+  ggplot(aes(Quarter, value, colour = name))
+
+us_change |>
+  select(-Consumption, -Income) |>
+  pivot_longer(-Quarter) |>
+  ggplot(aes(Quarter, value, colour = name)) +
+  geom_line()
+
+us_change |>
+  select(-Consumption, -Income) |>
+  pivot_longer(-Quarter) |>
+  ggplot(aes(Quarter, value, colour = name)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y")
+
+us_change |>
+  select(-Consumption, -Income) |>              
+  pivot_longer(-Quarter) |>                       
+  ggplot(aes(Quarter, value, colour = name)) +  # aesthetic mappings, x,y,color, shape, size, fill, group etc.
+  geom_line() +                                 #
+  facet_grid(name ~ ., scales = "free_y") +
+  guides(colour = "none")                       # Just drops the legend (As not needed now as we have diff. facets)
+
+us_change |>
+  select(-Consumption, -Income) |>
+  pivot_longer(-Quarter) |>
+  ggplot(aes(Quarter, value, colour = name)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y") +
+  guides(colour = "none") +
+  labs(y="% change")                              # just labelling the y axis
+
+```
+##### Scatterplots and Correlation Plots
+
+```{r}
+
+us_change |>
+  GGally::ggpairs(columns = 2:6)
+
+```
+
+Assumptions
+First, we assume that the model is "a reasonable approximation to reality";
+that is, the relationship between the forecast variable and the predictor variables satisfies this linear equation.
+
+Second, we make the following assumptions about the errors  (ε1,…,εT): 
+<!-- they have mean zero; otherwise the forecasts will be systematically biased.  -->
+<!-- they are not autocorrelated; otherwise the forecasts will be inefficient, as there is more information in the data that can be exploited. -->
+<!-- they are unrelated to the predictor variables; otherwise there would be more information that should be included in the systematic part of the model. -->
+
+It is also useful to have the errors being normally distributed with a constant variance  σ2  in order to easily produce prediction intervals.
+
+Another important assumption in the linear regression model is that each predictor  x  is not a random variable. 
+
+With observational data (including most data in business and economics), it is not possible to control the value of  x , we simply observe it. Hence we make this an assumption.
+
+##### Least squares estimation
+
+```{r Least squares estimation}
+
+# US consumption expenditure
+
+us_change
+
+fit_consMR <- us_change |>
+  model(tslm = TSLM(Consumption ~ Income + Production +
+                                    Unemployment + Savings))           # multi-linear ergression
+fit_consMR
+
+report(fit_consMR)          # model report
+
+
+
+```
+###### augment() function for fitted values
+
+```{r Fitted values}
+
+# Fitted values
+
+augment(fit_consMR)       # gives, .model (name) .fitted, .resid, .innov REsiduals
+
+augment(fit_consMR) |>
+  ggplot(
+    aes(x=Quarter)
+  ) +
+  geom_line(aes(y=Consumption, colour = "Data")) + # "Data" manual legend trick (scale_colour_manual is follwed)
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "% change",
+    title = "Percent change in US consumption expenditure"
+  ) +
+  scale_colour_manual(values=c(Data="black",Fitted="#D55E00")) + 
+  guides(colour = guide_legend(title = NULL))                    # removing legend title ? else it will be colour
+
+  
+
+
+
+```
+
+
+```{r}
+# with abline fitted on graph (i.e. y and y_hat)
+
+augment(fit_consMR)
+
+augment(fit_consMR) |>
+  
+  ggplot(aes(x = Consumption, y = .fitted)) +
+  
+  geom_point() +
+  
+  labs(
+    y = "Fitted (predicted values)",
+    x = "Data (actual values)",
+    title = "Percent change in US consumption expenditure"
+  ) +
+  
+  geom_abline(intercept = 0, slope = 1)
+
+```
+##### Evaluating the regression model
+
+Residual plot
+ACF of residuals
+Histogram of residuals
+
+```{r}
+
+fit_consMR |> gg_tsresiduals()
+
+
+```
+The time plot shows some changing variation over time, but is otherwise relatively unremarkable. This heteroscedasticity will potentially make the prediction interval coverage inaccurate.
+
+The histogram shows that the residuals seem to be slightly skewed, which may also affect the coverage probability of the prediction intervals.
+
+The autocorrelation plot shows a significant spike at lag 7, and a significant Ljung-Box test at the 5% level.
+
+```{r}
+
+augment(fit_consMR) |>
+  features(.innov, ljung_box, lag = 10)
+
+```
+Thus, Residuals are not a white noise, and there is still info left in residuals. (For getting that info..CHapter 10) -- Dynamic Regression Techniques
+
+###### Residual plots against predictors
+
+```{r}
+# Residual plots against predictors (all)
+
+us_change
+fit_consMR
+residuals(fit_consMR)
+str(fit_consMR)
+
+fit_consMR$tslm
+
+residuals(fit_consMR)
+
+us_change |>
+  
+  left_join(residuals(fit_consMR), by = "Quarter") |>
+  
+  pivot_longer(Income:Unemployment,
+               names_to = "regressor", values_to = "x") |>
+  
+  ggplot(aes(x = x, y = .resid)) +
+  
+  geom_point() +
+  
+  facet_grid(. ~ regressor, scales = "free_x") +
+  
+#  facet_wrap(. ~ regressor, scales = "free_x") +              # facet_wrap(rows ~ cols)
+  
+  labs(y = "Residuals", x = "")
+
+
+us_change |>
+  
+  left_join(residuals(fit_consMR), by = "Quarter") |>
+  
+  pivot_longer(Income:Unemployment,
+               names_to = "regressor", values_to = "x") |>
+  
+  ggplot(aes(x = x, y = .resid)) +
+  
+  geom_point() +
+  
+#  facet_grid(. ~ regressor, scales = "free_x") +
+  
+  facet_wrap(. ~ regressor, scales = "free_x") +              # facet_wrap(rows ~ cols) #automatic wrapping
+  
+  labs(y = "Residuals", x = "")
+
+```
+###### Residual plots against fitted values
+
+```{r}
+# Residual plots against fitted values
+
+fit_consMR
+augment(fit_consMR)
+
+augment(fit_consMR) |>
+  
+  ggplot(aes(x = .fitted, y = .resid)) +
+  geom_point() + labs(x = "Fitted", y = "Residuals")
+
+```
+###### Outliers and influential observations
+
+```{r Outliers and influential observations}
+# Outliers and influential observations
+# Observations that have a large influence on the estimated coefficients of a regression model are called influential observations
+
+```
+
+###### Spurious regression
+
+```{r Spurious regression}
+# Spurious regression
+
+# More often than not, time series data are “non-stationary”; that is, the values of the time series do not fluctuate around a constant mean or with a constant variance.
+# here we need to address the effect that non-stationary data can have on regression models.
+
+
+# Cases of spurious regression might appear to give reasonable short-term forecasts, but they will generally not continue to work into the future.
+
+aus_airpassengers         # Year | Passengers
+
+guinea_rice               # Rice Production Year | Production
+
+fit <- aus_airpassengers |>
+
+  filter(Year <= 2011) |>
+  
+  left_join(guinea_rice, by = "Year") |>
+  
+  model(TSLM(Passengers ~ Production))             # Linear model TSLM
+
+report(fit)
+
+fit |> gg_tsresiduals()
+
+
+
+```
+Regressing non-stationary time series can lead to spurious regressions. The output of regressing Australian air passengers on rice production in Guinea is shown in Figure 7.13. High R2  and high residual autocorrelation can be signs of spurious regression.
+
+The innovation residuals are not white noise...so not a model we are looking for.
+
+```{r}
+
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
 ```{r}
 ```
 
@@ -1894,8 +2643,168 @@ fc |>
 ```
 
 
+```{r}
+```
 
 
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
 
 
 
