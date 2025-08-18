@@ -2824,7 +2824,7 @@ boston_men |>
 
 
 ```
-# The best forecasts appear to come from the piecewise linear trend.
+The best forecasts appear to come from the piecewise linear trend.
 
 ###### Correlation, causation and forecasting
 
@@ -2839,42 +2839,242 @@ boston_men |>
 # Multicollinearity and forecasting
 
 
+####################################################################################
+#                                                                               ####
+# Matrix formulation                                                            ####
+# Least squares estimation                                                      ####
+# Fitted values and cross-validation                                            ####
+#   - hat-matrix | -CV statistic | leverage | influential points                ####
+# Forecasts and prediction intervals                                            ####
+#                                                                               ####
+####################################################################################
+
+```
+
+#### Exponential smoothing
+
+```{r Exponential smoothing}
+
+# two Parts : 
+#  In the first part (Sections 8.1–8.4) we present the mechanics of the most important exponential smoothing methods, and their application in forecasting time series with various characteristics. This helps us develop an intuition to how these methods work. In this setting, selecting and using a forecasting method may appear to be somewhat ad hoc. The selection of the method is generally based on recognising key components of the time series (trend and seasonal) and the way in which these enter the smoothing method (e.g., in an additive, damped or multiplicative manner).
+# 
+# In the second part of the chapter (Sections 8.5–8.7) we present the statistical models that underlie exponential smoothing methods. These models generate identical point forecasts to the methods discussed in the first part of the chapter, but also generate prediction intervals. Furthermore, this statistical framework allows for genuine model selection between competing models.
+
+```
+
+###### Part 1
+####### Simple exponentail smoothing
+
+```{r}
+
+global_economy 
+
+algeria_economy <- global_economy |>
+  filter(Country == "Algeria")
+algeria_economy
+
+algeria_economy |> 
+  autoplot(Exports) +
+  labs(y="% of GDP", title = "Exports from Algeria")
+
+```
+
+The simplest of the exponentially smoothing methods is naturally called simple exponential smoothing (SES)16. This method is suitable for forecasting data with no clear trend or seasonal pattern.
+In above figure, no clear trend and seasonality
+So lets go ahead with SES
+
+Note: There is a decline in the last few years, which might suggest a trend. We will consider whether a trended method would be better for this series later in this chapter.)
+
+
+SES different forms - 
+<!-- Weighted average form -->
+<!-- Component form (useful to write other major complicated forms) -->
+<!-- Flat forecasts -->
+
+Optimisation
+  Unlike the regression case (where we have formulas which return the values of the regression coefficients that minimise the SSE), this involves a non-linear minimisation problem, and we need to use an optimisation tool to solve it.
+
+```{r}
+# lets fit a model to algerian exports
+
+algeria_economy
+
+# fit
+fit <- algeria_economy |>
+  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+
+fit
+
+augment(fit)
+
+# forecast
+fc <- fit |>
+  forecast(h=5)
+fc
+
+# plotting
+
+fc |> 
+  autoplot(algeria_economy) +               # no levels provided spo by default 80 & 95%
+  geom_line(
+    aes(y = .fitted),
+    col = '#D55E00',
+    data = augment(fit)
+  ) +
+  labs(
+    y = "% of GDP",
+    title = "Exports : Algeria"
+  ) + 
+  guides(colour = "None")
+
+```
+The forecasts for the period 2018–2022 are plotted in Figure. Also plotted are one-step-ahead fitted values alongside the data over the period 1960–2017. The large value of  α  in this example is reflected in the large adjustment that takes place in the estimated level  ℓt  at each time. A smaller value of  α  would lead to smaller changes over time, and so the series of fitted values would be smoother.
+
+The prediction intervals shown here are calculated using the methods described in Section 8.7. The prediction intervals show that there is considerable uncertainty in the future exports over the five-year forecast period. So interpreting the point forecasts without accounting for the large uncertainty can be very misleading.
+
+####### Methods with trend
+Holt’s linear trend method
+Damped trend methods
+
+```{r}
+#                                          HLT 
+# Australian population
+
+global_economy
+
+aus_economy <- global_economy |>
+  filter(Country == "Australia") |>
+  mutate(Pop = Population/1e6)           # population to millions
+
+aus_economy
+
+autoplot(aus_economy, Pop) +
+  labs(y = "Millions", title = "Australian Population over years")
+
+
+######################### fitting HLT method
+
+fit <- aus_economy |>
+  model(
+    AAN = ETS(Pop ~ error("A") + trend("A") + season("N"))        # additive - error + trend and No season
+  )
+  
+fit
+
+# forecast
+fc <- fit |> forecast(h=10)
+fc
+
 ```
 
 
 ```{r}
+
+# Holt's and damped both
+
+aus_economy
+
+aus_economy |>
+  model(
+    `Holt's method` = ETS(Pop ~ error("A") +                    # holts linear trend - AAN
+                       trend("A") + season("N")),
+    `Damped Holt's method` = ETS(Pop ~ error("A") +
+                       trend("Ad", phi = 0.9) + season("N"))    # damped -> A, Ad, N ||| phi -> Damping parameter
+  ) |>
+  forecast(h = 15) |>
+  autoplot(aus_economy, level = NULL) +
+  labs(title = "Australian population",
+       y = "Millions") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+
 ```
+Another Example : Internet usage
+
+```{r}
+WWWusage
+
+# Converting to tsibble
+
+ww_usage <- as_tsibble(WWWusage)
+ww_usage
+
+
+ww_usage |>
+  autoplot(value) + 
+  labs(
+    x = "Minute",
+    y = "Numb. of Users",
+    title = "Internet Usage per Minute"
+  )
+
+
+# We will use time series cross-validation to compare the one-step forecast accuracy of the three methods.
+
+ww_usage
+
+ww_usage |>
+  stretch_tsibble(.init = 10) |>                          # increasing training sets (increase sby 1 data                                                                    points and starts from 10 data points in a dataset)
+  model(
+    SES = ETS(value ~ error("A") + trend("N") + season("N")),         # Eimple exponential (ANN)
+    Holt = ETS(value ~ error("A") + trend("A") + season("N")),        # holt linear trend  (AAN)
+    Damped = ETS(value ~ error("A") + trend("Ad") +                   # Damped             (A, AD, N)
+                   season("N"))
+  ) |>
+  forecast(h = 1) |>                                                  # 1 step ahead forecasts
+  accuracy(ww_usage)                                                  # acccuracy 
+
+```
+
+Damped Holt’s method is best whether you compare MAE or RMSE values or MAPE. So we will proceed with using the damped Holt’s method and apply it to the whole data set to get forecasts for future minutes.
+
+Damped model wins on all key error metrics: RMSE, MAE, MAPE, MASE, RMSSE.
+Holt has slightly better ME, MPE, and ACF1 — which might matter if:
+You’re highly sensitive to bias (ME/MPE), or
+You care a lot about residual independence (ACF1)
+
+* sticking to Damped
+
+```{r}
+# Implementing on whole data to have future forecasts
+
+fit <- ww_usage |>
+  model(
+    Damped = ETS(
+      value ~ error("A") + trend("Ad") + season("N"))
+  )
+
+fit
+
+# Estimated parameters:
+tidy(fit)
+
+# 
+
+```
+The smoothing parameter for the slope is estimated to be almost one, indicating that the trend changes to mostly reflect the slope between the last two minutes of internet usage. The value of  α  is very close to one, showing that the level reacts strongly to each new observation.
 
 
 ```{r}
-```
+# forecasting
 
+fit |>
+  forecast(h = 10) |>
+  autoplot(ww_usage) +
+  labs(x="Minute", 
+       y="Number of users",
+       title = "Internet usage per minute")
+
+```
+The resulting forecasts look sensible with decreasing trend, which flattens out due to the low value of the damping parameter (0.815), and relatively wide prediction intervals reflecting the variation in the historical data.
+
+Note: 
+  In this example, the process of selecting a method was relatively easy as both MSE and MAE comparisons suggested the same method (damped Holt’s). However, sometimes different accuracy measures will suggest different forecasting methods, and then a decision is required as to which forecasting method we prefer to use. As forecasting tasks can vary by many dimensions (length of forecast horizon, size of test set, forecast error measures, frequency of data, etc.), it is unlikely that one method will be better than all others for all forecasting scenarios. What we require from a forecasting method are consistently sensible forecasts, and these should be frequently evaluated against the task at hand.
 
 ```{r}
-```
 
 
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
-```
-
-
-```{r}
 ```
 
 
