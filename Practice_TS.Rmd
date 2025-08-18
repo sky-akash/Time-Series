@@ -3072,17 +3072,163 @@ The resulting forecasts look sensible with decreasing trend, which flattens out 
 Note: 
   In this example, the process of selecting a method was relatively easy as both MSE and MAE comparisons suggested the same method (damped Holt’s). However, sometimes different accuracy measures will suggest different forecasting methods, and then a decision is required as to which forecasting method we prefer to use. As forecasting tasks can vary by many dimensions (length of forecast horizon, size of test set, forecast error measures, frequency of data, etc.), it is unlikely that one method will be better than all others for all forecasting scenarios. What we require from a forecasting method are consistently sensible forecasts, and these should be frequently evaluated against the task at hand.
 
-```{r}
+####### Methods with seasonality
 
+```{r}
+# Methods with seasonality
+
+# Holt-Winters’ additive method
+# Holt-Winters’ Multiplicative method
+
+
+# example
+
+# Domestic overnight trips in Australia
+
+tourism 
+
+aus_tourism <- tourism |>
+  filter(Purpose == "Holiday") |>
+  summarise(Trips = sum(Trips)/1e3) 
+
+aus_tourism
+colnames(tourism)
+
+fit <- aus_tourism |>
+  model(
+    additive = ETS(Trips ~ error("A") + trend("A") + season("A")),
+    
+    multiplicative = ETS(Trips ~ error("M") + trend("A") + season("M"))
+    )
+fit
+
+fc <- fit |> forecast(h="3 years")
+fc
+
+fc |> 
+  autoplot(
+    aus_tourism, level= NULL) +
+  labs(
+    title = "Aus Domestic Tourism",
+    y = "Overnight Trips in millions"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+# extracting models from mable
+# using pluck from purrr package
+
+library(purrr)
+
+additive_model <- fit |>
+  pull(additive) |>
+  pluck(1)
+
+multiplicative_model <- fit |>
+  pull(multiplicative) |>
+  pluck(1)
+
+
+
+# 
+library(patchwork)  # For combining ggplots
+
+
+additive_components <- components(additive_model)
+multiplicative_components <- components(multiplicative_model)
+
+# indiv plots 
+p1 <- autoplot(additive_components) +
+  labs(title = "Additive ETS Model Components")
+
+p2 <- autoplot(multiplicative_components) +
+  labs(title = "Multiplicative ETS Model Components")
+
+# combined output 
+p1 + p2
+
+#  Model estimates and parameters
+tidy(fit)
+
+report(fit)
 
 ```
 
+* Notice that the additive seasonal component sums to approximately zero. The smoothing parameters are  
+ α=0.2620 ,  β∗=0.1646,  γ=0.0001 and RMSE=0.4169 .
+
+* Notice that the multiplicative seasonal component sums to approximately  m=4. The smoothing parameters are  α=0.2237 ,  β∗=0.1360 ,  γ=0.0001  and RMSE  =0.4122 .
+
+
+
+.. ################################################################################################################
+
+                                            :::: IMPORTANT NOTE :::: 
+    
+    Use select() when you want to feed the model back into tidy forecasting functions like gg_tsresiduals().
+
+    Use pull() |> pluck(1) when you want to directly manipulate the model, get components, coefficients, or            detailed reports.
+
+.. ################################################################################################################
 
 ```{r}
+
+# residuals of additive model
+
+gg_tsresiduals(fit |> select(additive))
+
+# residuals of multiplicative model
+gg_tsresiduals(fit |> select(multiplicative))
+
+
+
 ```
+Holt-Winters’ damped method
 
 
-```{r}
+```{r Holt-Winters method with daily data}
+# Holt-Winters method with daily data
+
+pedestrian 
+
+str(pedestrian)
+
+colnames(pedestrian)
+
+
+# The Holt-Winters method can also be used for daily type of data, where the seasonal period is   m
+# =7 , and the appropriate unit of time for  h  is in days. Here we forecast pedestrian traffic at a busy Melbourne train station in July 2016.
+
+
+sth_cross_ped <- 
+
+  pedestrian |>
+  
+  filter(Date >= "2016-07-01",
+         Sensor == "Southern Cross Station") |>
+  
+  index_by(Date) |>                                           # indexing buy date created date groups
+  
+  summarise(Count = sum(Count)/1000)                          # cums of pass on a day in thousands
+
+
+sth_cross_ped |>
+  
+  filter(Date <= "2016-07-31") |>                                   # training model till July End
+  
+  model(
+    hw = ETS(Count ~ error("M") + trend("Ad") + season("M"))        # hots multiplicative damped model
+  ) |>
+  
+  forecast(h = "2 weeks") |>                                        # forecasting Till Ausugt Mid
+  
+  autoplot(sth_cross_ped |> filter(Date <= "2016-08-14")) +
+  
+  labs(title = "Daily traffic: Southern Cross",
+       y="Pedestrians ('000)")
+
+
+
 ```
 
 
